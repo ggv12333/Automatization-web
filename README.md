@@ -66,8 +66,20 @@ A modern web-based automation platform for running AutoDock Vina molecular docki
 
 ## 🚀 Quick Start
 
-### **Run Locally**
+### **Run Locally (Quick Start)**
 
+**Option A: Use the automated script (Easiest)**
+```bash
+# Clone the repository
+git clone https://github.com/ggv12333/Automatization-web.git
+cd Automatization-web
+
+# Run the script (it will guide you)
+chmod +x run.sh
+./run.sh
+```
+
+**Option B: Manual setup**
 ```bash
 # Clone the repository
 git clone https://github.com/ggv12333/Automatization-web.git
@@ -88,6 +100,8 @@ node server.js
 # Access the application
 open http://localhost:8080
 ```
+
+**See [QUICK_START.md](QUICK_START.md) for detailed instructions.**
 
 ### **Run with Docker**
 
