@@ -499,14 +499,14 @@ router.post("/run", dockingLimiter, upload.fields([
 
   // ==================== ADVANCED MODE: Prepare files ====================
   if (mode === 'advanced') {
-    console.log("\n🔧 Advanced Mode: Preparing molecules...");
+    logger.info("🔧 Advanced Mode: Preparing molecules...", { requestId: req.id });
 
     const pythonPath = process.env.PYTHON_PATH || "/usr/bin/python3";
     const preparePath = path.join(__dirname, "../python/prepare_molecules.py");
 
     // Prepare proteins
     if (req.body.pdbCode) {
-      console.log(`📥 Downloading PDB: ${req.body.pdbCode}`);
+      logger.info(`📥 Downloading PDB: ${req.body.pdbCode}`, { requestId: req.id });
       // PDB download will be handled by prepare_molecules.py
     }
 
@@ -519,7 +519,7 @@ router.post("/run", dockingLimiter, upload.fields([
 
     // For now, we'll copy PDBQT files directly
     // Format conversion will happen in next phase
-    console.log("📋 Note: Format conversion will be implemented in next phase");
+    logger.debug("📋 Note: Format conversion will be implemented in next phase", { requestId: req.id });
   }
 
   // Leer todas las configuraciones (soporta formato key=value)
@@ -529,7 +529,7 @@ router.post("/run", dockingLimiter, upload.fields([
     if (mode === 'advanced' && req.body.interactiveConfig) {
       const interactiveConfig = JSON.parse(req.body.interactiveConfig);
       configMap['interactive'] = interactiveConfig;
-      console.log(`  ✅ Interactive config loaded`);
+      logger.debug(`✅ Interactive config loaded`, { requestId: req.id });
     }
 
     // For traditional mode or advanced mode with config file
@@ -547,7 +547,7 @@ router.post("/run", dockingLimiter, upload.fields([
       }
 
       configMap[configName] = configData;
-      console.log(`  ✅ Config leída: ${path.basename(configPath)}`);
+      logger.debug(`✅ Config leída: ${path.basename(configPath)}`, { requestId: req.id });
     }
 
     // For advanced mode with config file (single config for all proteins)
@@ -563,7 +563,7 @@ router.post("/run", dockingLimiter, upload.fields([
       }
 
       configMap[configName] = configData;
-      console.log(`  ✅ Advanced config leída: ${path.basename(configPath)}`);
+      logger.debug(`✅ Advanced config leída: ${path.basename(configPath)}`, { requestId: req.id });
     }
 
     // For advanced mode with multiple configs (per-protein configs)
@@ -579,7 +579,7 @@ router.post("/run", dockingLimiter, upload.fields([
       }
 
       configMap[configName] = configData;
-      console.log(`  ✅ Per-protein config leída: ${path.basename(configPath)}`);
+      logger.debug(`✅ Per-protein config leída: ${path.basename(configPath)}`, { requestId: req.id });
     }
   } catch (err) {
     return res.status(400).json({ error: "Error reading configuration files", details: err.message });
@@ -590,22 +590,22 @@ router.post("/run", dockingLimiter, upload.fields([
   fs.mkdirSync(ligandsDir, { recursive: true });
 
   // Copy ligand files to the folder inside WORKDIR
-  console.log(`📂 Copying ligands to: ${ligandsDir}`);
+  logger.info(`📂 Copying ligands to: ${ligandsDir}`, { requestId: req.id });
 
   // Traditional mode ligands
   for (const file of ligandFiles) {
     const basename = path.basename(file);
     const dest = path.join(ligandsDir, basename);
-    console.log(`  Copying: ${file} → ${dest}`);
+    logger.debug(`Copying ligand: ${file} → ${dest}`, { requestId: req.id });
     try {
       if (!fs.existsSync(file)) {
-        console.error(`  ⚠️  File does not exist: ${file}`);
+        logger.warn(`⚠️  File does not exist: ${file}`, { requestId: req.id });
         continue;
       }
       fs.copyFileSync(file, dest);
-      console.log(`  ✅ Copied: ${basename}`);
+      logger.debug(`✅ Copied ligand: ${basename}`, { requestId: req.id });
     } catch (err) {
-      console.error(`  ❌ Error copying ${file} → ${dest}:`, err.message);
+      logger.error(`❌ Error copying ligand ${file} → ${dest}`, { error: err.message, requestId: req.id });
     }
   }
 
@@ -613,16 +613,16 @@ router.post("/run", dockingLimiter, upload.fields([
   for (const file of ligandPdbqtFiles) {
     const basename = path.basename(file);
     const dest = path.join(ligandsDir, basename);
-    console.log(`  Copying advanced ligand: ${file} → ${dest}`);
+    logger.debug(`Copying advanced ligand: ${file} → ${dest}`, { requestId: req.id });
     try {
       if (!fs.existsSync(file)) {
-        console.error(`  ⚠️  File does not exist: ${file}`);
+        logger.warn(`⚠️  File does not exist: ${file}`, { requestId: req.id });
         continue;
       }
       fs.copyFileSync(file, dest);
-      console.log(`  ✅ Copied: ${basename}`);
+      logger.debug(`✅ Copied advanced ligand: ${basename}`, { requestId: req.id });
     } catch (err) {
-      console.error(`  ❌ Error copying ${file} → ${dest}:`, err.message);
+      logger.error(`❌ Error copying advanced ligand ${file} → ${dest}`, { error: err.message, requestId: req.id });
     }
   }
 
@@ -640,24 +640,24 @@ router.post("/run", dockingLimiter, upload.fields([
   }
 
   // Copy receptor files to WORKDIR
-  console.log(`📂 Copying receptors to: ${WORKDIR}`);
+  logger.info(`📂 Copying receptors to: ${WORKDIR}`, { requestId: req.id });
   const copiedReceptors = [];
 
   // Traditional mode receptors
   for (const file of receptorFiles) {
     const basename = path.basename(file);
     const dest = path.join(WORKDIR, basename);
-    console.log(`  Copying: ${file} → ${dest}`);
+    logger.debug(`Copying receptor: ${file} → ${dest}`, { requestId: req.id });
     try {
       if (!fs.existsSync(file)) {
-        console.error(`  ⚠️  File does not exist: ${file}`);
+        logger.warn(`⚠️  File does not exist: ${file}`, { requestId: req.id });
         continue;
       }
       fs.copyFileSync(file, dest);
       copiedReceptors.push(dest);
-      console.log(`  ✅ Copied: ${basename}`);
+      logger.debug(`✅ Copied receptor: ${basename}`, { requestId: req.id });
     } catch (err) {
-      console.error(`  ❌ Error copying ${file} → ${dest}:`, err.message);
+      logger.error(`❌ Error copying receptor ${file} → ${dest}`, { error: err.message, requestId: req.id });
     }
   }
 
@@ -665,17 +665,17 @@ router.post("/run", dockingLimiter, upload.fields([
   for (const file of receptorPdbqtFiles) {
     const basename = path.basename(file);
     const dest = path.join(WORKDIR, basename);
-    console.log(`  Copying advanced receptor: ${file} → ${dest}`);
+    logger.debug(`Copying advanced receptor: ${file} → ${dest}`, { requestId: req.id });
     try {
       if (!fs.existsSync(file)) {
-        console.error(`  ⚠️  File does not exist: ${file}`);
+        logger.warn(`⚠️  File does not exist: ${file}`, { requestId: req.id });
         continue;
       }
       fs.copyFileSync(file, dest);
       copiedReceptors.push(dest);
-      console.log(`  ✅ Copied: ${basename}`);
+      logger.debug(`✅ Copied advanced receptor: ${basename}`, { requestId: req.id });
     } catch (err) {
-      console.error(`  ❌ Error copying ${file} → ${dest}:`, err.message);
+      logger.error(`❌ Error copying advanced receptor ${file} → ${dest}`, { error: err.message, requestId: req.id });
     }
   }
 
@@ -694,7 +694,7 @@ router.post("/run", dockingLimiter, upload.fields([
     if (!userConfig) {
       const firstConfigKey = Object.keys(configMap)[0];
       userConfig = configMap[firstConfigKey];
-      console.log(`⚠️  No se encontró config para ${receptorName}, usando: ${firstConfigKey}`);
+      logger.warn(`⚠️  No se encontró config para ${receptorName}, usando: ${firstConfigKey}`, { requestId: req.id });
     }
 
     return {
@@ -714,10 +714,10 @@ router.post("/run", dockingLimiter, upload.fields([
   const pythonScript = path.join(__dirname, "../python/Automatizacion2_7.py");
   const pythonPath = process.env.PYTHON_PATH || "/usr/bin/python3";
 
-  console.log(`Usando Python en: ${pythonPath}`);
-  console.log(`Procesando ${pythonConfigs.length} receptor(es)...`);
+  logger.info(`Usando Python en: ${pythonPath}`, { requestId: req.id });
+  logger.info(`Procesando ${pythonConfigs.length} receptor(es)...`, { requestId: req.id });
   pythonConfigs.forEach((config, idx) => {
-    console.log(`  [${idx + 1}] ${path.basename(config.receptor)}`);
+    logger.debug(`[${idx + 1}] ${path.basename(config.receptor)}`, { requestId: req.id });
   });
 
   // Create a session ID for this docking run
@@ -745,7 +745,7 @@ router.post("/run", dockingLimiter, upload.fields([
   let errorData = "";
 
   // Send response immediately with sessionId (non-blocking)
-  console.log(`📊 Enviando respuesta con sessionId: ${sessionId}`);
+  logger.info(`📊 Enviando respuesta con sessionId: ${sessionId}`, { sessionId, requestId: req.id });
   res.json({
     message: "Docking iniciado",
     sessionId: sessionId,
@@ -761,7 +761,7 @@ router.post("/run", dockingLimiter, upload.fields([
       if (!message) continue;
 
       outputData += message + "\n";
-      console.log(`[PYTHON]: ${message}`);
+      logger.debug(`[PYTHON]: ${message}`, { sessionId, requestId: req.id });
 
       // Helper function to strip UUID prefix from names
       const stripUUID = (name) => {
@@ -802,11 +802,11 @@ router.post("/run", dockingLimiter, upload.fields([
           const totalProteins = parseInt(match[2]);
           progressData.proteinsProcessed = completedProteins;
 
-          console.log(`✅ Protein ${completedProteins}/${totalProteins} completed`);
+          logger.info(`✅ Protein ${completedProteins}/${totalProteins} completed`, { sessionId, completedProteins, totalProteins, requestId: req.id });
 
           // Mark as completed ONLY when all proteins are done
           if (completedProteins === totalProteins) {
-            console.log(`🎉 All proteins completed! (${completedProteins}/${totalProteins})`);
+            logger.info(`🎉 All proteins completed! (${completedProteins}/${totalProteins})`, { sessionId, requestId: req.id });
             progressData.status = 'completed';
           }
         }
@@ -824,7 +824,7 @@ router.post("/run", dockingLimiter, upload.fields([
     if (!errorMsg) return;
 
     errorData += errorMsg + "\n";
-    console.error(`[ERROR PYTHON]: ${errorMsg}`);
+    logger.error(`[ERROR PYTHON]: ${errorMsg}`, { sessionId, requestId: req.id });
     progressData.logs.push({
       timestamp: new Date().toISOString(),
       message: `ERROR: ${errorMsg}`,
@@ -833,7 +833,7 @@ router.post("/run", dockingLimiter, upload.fields([
   });
 
   child.on("close", code => {
-    console.log(`🚀 Proceso Python finalizado con código ${code}`);
+    logger.info(`🚀 Proceso Python finalizado con código ${code}`, { sessionId, exitCode: code, requestId: req.id });
 
     // Only set status if it hasn't been set already by progress parsing
     // This handles the case where the process exits before we parse the final messages
@@ -845,10 +845,11 @@ router.post("/run", dockingLimiter, upload.fields([
           progressData.status = 'completed';
         } else {
           // Process exited but not all proteins were processed - this is an error
-          console.error(`⚠️ Process exited but only ${progressData.proteinsProcessed}/${progressData.totalProteins} proteins completed`);
+          logger.warn(`⚠️ Process exited but only ${progressData.proteinsProcessed}/${progressData.totalProteins} proteins completed`, { sessionId, proteinsProcessed: progressData.proteinsProcessed, totalProteins: progressData.totalProteins, requestId: req.id });
           progressData.status = 'error';
         }
       } else {
+        logger.error(`Python process exited with error code ${code}`, { sessionId, exitCode: code, requestId: req.id });
         progressData.status = 'error';
       }
     }
