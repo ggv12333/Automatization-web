@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MIT License
 - CHANGELOG.md for version tracking
 - Improved documentation in README.md
+- **Complete molecule preparation system**:
+  - Command-line interface for `prepare_molecules.py`
+  - Automatic PDB download and preparation
+  - PDB → PDBQT conversion for receptors
+  - SMILES/SDF/MOL2 → PDBQT conversion for ligands
+  - Full integration in advanced mode docking flow
+- QUICK_START.md guide for easy project execution
+- run.sh automation script
+- MOLECULE_PREPARATION.md comprehensive documentation
 
 ### Changed
 - Cleaned up repository (removed test files)
@@ -21,10 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - 36 console statements replaced with Winston logger
   - Added requestId and sessionId context to all log messages
   - Improved log levels (debug/info/warn/error)
+- **Advanced mode now fully functional**: Molecule preparation is now executed automatically
 
 ### Fixed
 - Improved file structure documentation
 - Better traceability with structured logging
+- Molecule preparation was partially implemented, now complete and integrated
 
 ## [1.0.0] - 2024-10-28
 
