@@ -8,6 +8,8 @@ Also handles PDB download and preparation
 import os
 import sys
 import subprocess
+import json
+import shutil
 from pathlib import Path
 import requests
 from typing import Optional, List, Tuple
@@ -171,17 +173,146 @@ class MoleculePreparator:
 
 
 def main():
-    """Test the preparation module"""
-    preparator = MoleculePreparator("/tmp/test_prep")
+    """Main entry point for command-line usage"""
+    if len(sys.argv) < 3:
+        print("Usage:", file=sys.stderr)
+        print("  download-pdb <pdb_code> <output_dir>", file=sys.stderr)
+        print("  prepare-receptor <pdb_file> <output_dir>", file=sys.stderr)
+        print("  prepare-ligands <json_files> <output_dir>", file=sys.stderr)
+        sys.exit(1)
     
-    # Test PDB download
-    pdb_file = preparator.download_pdb("7E2Y")
-    if pdb_file:
-        pdbqt = preparator.prepare_receptor(str(pdb_file))
+    command = sys.argv[1]
     
-    # Test SMILES conversion
-    smiles = "CC(=O)Oc1ccccc1C(=O)O"  # Aspirin
-    pdbqt = preparator.prepare_ligand_from_smiles(smiles, "aspirin")
+    if command == "download-pdb":
+        if len(sys.argv) != 4:
+            print("❌ Error: download-pdb requires: <pdb_code> <output_dir>", file=sys.stderr)
+            sys.exit(1)
+        
+        pdb_code = sys.argv[2]
+        output_dir = sys.argv[3]
+        
+        preparator = MoleculePreparator(output_dir)
+        
+        # Download PDB
+        pdb_file = preparator.download_pdb(pdb_code)
+        if not pdb_file:
+            print(f"❌ Failed to download PDB {pdb_code}", file=sys.stderr)
+            sys.exit(1)
+        
+        # Prepare receptor
+        pdbqt_file = preparator.prepare_receptor(str(pdb_file))
+        if not pdbqt_file:
+            print(f"❌ Failed to prepare receptor for {pdb_code}", file=sys.stderr)
+            sys.exit(1)
+        
+        print(f"✅ Success: {pdbqt_file}", flush=True)
+        sys.exit(0)
+    
+    elif command == "prepare-receptor":
+        if len(sys.argv) != 4:
+            print("❌ Error: prepare-receptor requires: <pdb_file> <output_dir>", file=sys.stderr)
+            sys.exit(1)
+        
+        pdb_file = sys.argv[2]
+        output_dir = sys.argv[3]
+        
+        if not os.path.exists(pdb_file):
+            print(f"❌ Error: PDB file not found: {pdb_file}", file=sys.stderr)
+            sys.exit(1)
+        
+        preparator = MoleculePreparator(output_dir)
+        
+        # Prepare receptor
+        pdbqt_file = preparator.prepare_receptor(pdb_file)
+        if not pdbqt_file:
+            print(f"❌ Failed to prepare receptor from {pdb_file}", file=sys.stderr)
+            sys.exit(1)
+        
+        print(f"✅ Success: {pdbqt_file}", flush=True)
+        sys.exit(0)
+    
+    elif command == "prepare-ligands":
+        if len(sys.argv) != 4:
+            print("❌ Error: prepare-ligands requires: <json_files> <output_dir>", file=sys.stderr)
+            sys.exit(1)
+        
+        import json
+        json_files_str = sys.argv[2]
+        output_dir = sys.argv[3]
+        
+        try:
+            ligand_files = json.loads(json_files_str)
+        except json.JSONDecodeError as e:
+            print(f"❌ Error parsing JSON: {e}", file=sys.stderr)
+            sys.exit(1)
+        
+        preparator = MoleculePreparator(output_dir)
+        prepared_files = []
+        errors = []
+        
+        # Process SMILES files
+        for smiles_file in ligand_files.get('smiles', []):
+            if not os.path.exists(smiles_file):
+                errors.append(f"SMILES file not found: {smiles_file}")
+                continue
+            
+            results = preparator.process_smiles_file(smiles_file)
+            prepared_files.extend(results)
+        
+        # Process SDF files
+        for sdf_file in ligand_files.get('sdf', []):
+            if not os.path.exists(sdf_file):
+                errors.append(f"SDF file not found: {sdf_file}")
+                continue
+            
+            pdbqt = preparator.prepare_ligand_from_file(sdf_file)
+            if pdbqt:
+                prepared_files.append(pdbqt)
+            else:
+                errors.append(f"Failed to convert SDF: {sdf_file}")
+        
+        # Process MOL2 files
+        for mol2_file in ligand_files.get('mol2', []):
+            if not os.path.exists(mol2_file):
+                errors.append(f"MOL2 file not found: {mol2_file}")
+                continue
+            
+            pdbqt = preparator.prepare_ligand_from_file(mol2_file)
+            if pdbqt:
+                prepared_files.append(pdbqt)
+            else:
+                errors.append(f"Failed to convert MOL2: {mol2_file}")
+        
+        # PDBQT files are already prepared, just copy them
+        for pdbqt_file in ligand_files.get('pdbqt', []):
+            if os.path.exists(pdbqt_file):
+                import shutil
+                dest = Path(output_dir) / Path(pdbqt_file).name
+                shutil.copy2(pdbqt_file, dest)
+                prepared_files.append(dest)
+            else:
+                errors.append(f"PDBQT file not found: {pdbqt_file}")
+        
+        # Report results
+        if prepared_files:
+            print(f"✅ Prepared {len(prepared_files)} ligand(s)", flush=True)
+            for f in prepared_files:
+                print(f"  - {f}", flush=True)
+        
+        if errors:
+            for error in errors:
+                print(f"⚠️  {error}", file=sys.stderr, flush=True)
+        
+        if not prepared_files and errors:
+            print("❌ No ligands were successfully prepared", file=sys.stderr)
+            sys.exit(1)
+        
+        sys.exit(0)
+    
+    else:
+        print(f"❌ Unknown command: {command}", file=sys.stderr)
+        print("Available commands: download-pdb, prepare-receptor, prepare-ligands", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

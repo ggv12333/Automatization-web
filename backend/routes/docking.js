@@ -504,22 +504,146 @@ router.post("/run", dockingLimiter, upload.fields([
     const pythonPath = process.env.PYTHON_PATH || "/usr/bin/python3";
     const preparePath = path.join(__dirname, "../python/prepare_molecules.py");
 
-    // Prepare proteins
+    // Prepare proteins from PDB codes
     if (req.body.pdbCode) {
-      logger.info(`📥 Downloading PDB: ${req.body.pdbCode}`, { requestId: req.id });
-      // PDB download will be handled by prepare_molecules.py
+      const pdbCodes = req.body.pdbCode.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+      
+      for (const pdbCode of pdbCodes) {
+        if (!isValidPDBCode(pdbCode)) {
+          logger.warn(`Invalid PDB code skipped: ${pdbCode}`, { requestId: req.id });
+          continue;
+        }
+
+        logger.info(`📥 Downloading and preparing PDB: ${pdbCode}`, { requestId: req.id });
+        
+        try {
+          const child = spawn(pythonPath, [preparePath, "download-pdb", pdbCode, uploadPath]);
+          
+          let output = "";
+          let error = "";
+          
+          child.stdout.on("data", (data) => {
+            output += data.toString();
+            logger.debug(`[PDB Prep] ${data.toString()}`, { requestId: req.id });
+          });
+          
+          child.stderr.on("data", (data) => {
+            error += data.toString();
+            logger.debug(`[PDB Prep] ${data.toString()}`, { requestId: req.id });
+          });
+          
+          // Wait for completion synchronously (for PDB download)
+          const exitCode = await new Promise((resolve) => {
+            child.on("close", (code) => resolve(code));
+          });
+          
+          if (exitCode === 0) {
+            const preparedPdbqt = path.join(uploadPath, `${pdbCode}_receptor.pdbqt`);
+            if (fs.existsSync(preparedPdbqt)) {
+              receptorPdbqtFiles.push(preparedPdbqt);
+              logger.info(`✅ PDB ${pdbCode} prepared: ${preparedPdbqt}`, { requestId: req.id });
+            }
+          } else {
+            logger.error(`Failed to prepare PDB ${pdbCode}`, { error, requestId: req.id });
+          }
+        } catch (err) {
+          logger.error(`Error preparing PDB ${pdbCode}`, { error: err.message, requestId: req.id });
+        }
+      }
+    }
+
+    // Prepare receptors from PDB files
+    if (receptorPdbFiles.length > 0) {
+      logger.info(`🔧 Preparing ${receptorPdbFiles.length} receptor(s) from PDB files...`, { requestId: req.id });
+      
+      for (const pdbFile of receptorPdbFiles) {
+        try {
+          // Use Python script to prepare receptor
+          const child = spawn(pythonPath, [preparePath, "prepare-receptor", pdbFile, uploadPath]);
+          
+          let output = "";
+          let error = "";
+          
+          child.stdout.on("data", (data) => {
+            output += data.toString();
+            logger.debug(`[Receptor Prep] ${data.toString()}`, { requestId: req.id });
+          });
+          
+          child.stderr.on("data", (data) => {
+            error += data.toString();
+            logger.debug(`[Receptor Prep] ${data.toString()}`, { requestId: req.id });
+          });
+          
+          const exitCode = await new Promise((resolve) => {
+            child.on("close", (code) => resolve(code));
+          });
+          
+          if (exitCode === 0) {
+            // Find the prepared file (same name with _receptor.pdbqt suffix)
+            const baseName = path.basename(pdbFile, path.extname(pdbFile));
+            const preparedPdbqt = path.join(uploadPath, `${baseName}_receptor.pdbqt`);
+            if (fs.existsSync(preparedPdbqt)) {
+              receptorPdbqtFiles.push(preparedPdbqt);
+              logger.info(`✅ Receptor prepared: ${path.basename(preparedPdbqt)}`, { requestId: req.id });
+            }
+          } else {
+            logger.error(`Failed to prepare receptor ${path.basename(pdbFile)}`, { error, requestId: req.id });
+          }
+        } catch (err) {
+          logger.error(`Error preparing receptor ${path.basename(pdbFile)}`, { error: err.message, requestId: req.id });
+        }
+      }
     }
 
     // Prepare ligands from various formats
-    const ligandPrep = {
-      smiles: ligandSmilesFiles,
-      sdf: ligandSdfFiles,
-      mol2: ligandMol2Files
-    };
-
-    // For now, we'll copy PDBQT files directly
-    // Format conversion will happen in next phase
-    logger.debug("📋 Note: Format conversion will be implemented in next phase", { requestId: req.id });
+    // Always prepare ligands (includes copying PDBQT files)
+    if (ligandSmilesFiles.length > 0 || ligandSdfFiles.length > 0 || 
+        ligandMol2Files.length > 0 || ligandPdbqtFiles.length > 0) {
+      logger.info("🔧 Preparing ligands from various formats...", { requestId: req.id });
+      
+      const ligandFiles = {
+        smiles: ligandSmilesFiles,
+        sdf: ligandSdfFiles,
+        mol2: ligandMol2Files,
+        pdbqt: ligandPdbqtFiles  // Include PDBQT files for copying
+      };
+      
+      try {
+        const child = spawn(pythonPath, [
+          preparePath,
+          "prepare-ligands",
+          JSON.stringify(ligandFiles),
+          ligandsDir
+        ]);
+        
+        let output = "";
+        let error = "";
+        
+        child.stdout.on("data", (data) => {
+          output += data.toString();
+          logger.debug(`[Ligand Prep] ${data.toString()}`, { requestId: req.id });
+        });
+        
+        child.stderr.on("data", (data) => {
+          error += data.toString();
+          logger.debug(`[Ligand Prep] ${data.toString()}`, { requestId: req.id });
+        });
+        
+        // Wait for completion synchronously
+        const exitCode = await new Promise((resolve) => {
+          child.on("close", (code) => resolve(code));
+        });
+        
+        if (exitCode === 0) {
+          logger.info("✅ Ligands prepared successfully", { requestId: req.id });
+          // The prepared ligands are already in ligandsDir
+        } else {
+          logger.warn("⚠️ Some ligands may have failed to prepare", { error, requestId: req.id });
+        }
+      } catch (err) {
+        logger.error("Error preparing ligands", { error: err.message, requestId: req.id });
+      }
+    }
   }
 
   // Leer todas las configuraciones (soporta formato key=value)
@@ -585,7 +709,7 @@ router.post("/run", dockingLimiter, upload.fields([
     return res.status(400).json({ error: "Error reading configuration files", details: err.message });
   }
 
-  // Crear carpeta de ligandos dentro del WORKDIR
+  // Crear carpeta de ligandos dentro del WORKDIR (ya creada si se prepararon ligandos)
   const ligandsDir = path.join(WORKDIR, "ligands");
   fs.mkdirSync(ligandsDir, { recursive: true });
 
@@ -609,10 +733,18 @@ router.post("/run", dockingLimiter, upload.fields([
     }
   }
 
-  // Advanced mode ligands (PDBQT files only for now)
+  // Advanced mode: Copy PDBQT ligands directly (not prepared above)
+  // Note: If ligands were prepared from other formats, they're already in ligandsDir
   for (const file of ligandPdbqtFiles) {
     const basename = path.basename(file);
     const dest = path.join(ligandsDir, basename);
+    
+    // Skip if file already exists (may have been prepared)
+    if (fs.existsSync(dest)) {
+      logger.debug(`Ligand already exists (prepared): ${basename}`, { requestId: req.id });
+      continue;
+    }
+    
     logger.debug(`Copying advanced ligand: ${file} → ${dest}`, { requestId: req.id });
     try {
       if (!fs.existsSync(file)) {
