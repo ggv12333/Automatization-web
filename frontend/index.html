@@ -1,0 +1,1013 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>AutoDock Vina - Molecular Docking</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="wizard-styles.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-content">
+        <h1>🧬 AutoDock Vina</h1>
+        <p class="subtitle">Molecular Docking Automation Platform</p>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Upload Section -->
+      <div id="uploadSection" class="section">
+        <h2 class="section-title">📤 Upload Files</h2>
+
+        <form id="form" class="upload-form">
+          <!-- WIZARD MODE (Only Mode) -->
+          <div id="advancedMode" class="mode-content active">
+            <!-- Progress Indicator -->
+            <div class="step-progress">
+              <div class="step-item active" data-step="1">
+                <div class="step-number">1</div>
+                <div class="step-label">Proteins</div>
+              </div>
+              <div class="step-connector"></div>
+              <div class="step-item" data-step="2">
+                <div class="step-number">2</div>
+                <div class="step-label">Preparation</div>
+              </div>
+              <div class="step-connector"></div>
+              <div class="step-item" data-step="3">
+                <div class="step-number">3</div>
+                <div class="step-label">Configuration</div>
+              </div>
+              <div class="step-connector"></div>
+              <div class="step-item" data-step="4">
+                <div class="step-number">4</div>
+                <div class="step-label">Ligands</div>
+              </div>
+            </div>
+
+            <!-- Step 1: Protein Selection -->
+            <div class="wizard-step active" id="step1">
+              <div class="step-header">
+                <h3 class="step-title">🧬 Step 1: Protein Selection</h3>
+                <p class="step-description">Choose how you want to provide proteins for docking</p>
+              </div>
+
+              <div class="protein-method-selector">
+                <label class="method-card">
+                  <input type="radio" name="proteinMethod" value="pdbqt" class="method-radio">
+                  <div class="method-content">
+                    <div class="method-icon">🧬</div>
+                    <div class="method-info">
+                      <div class="method-title">PDBQT Files</div>
+                      <div class="method-desc">Ready for docking</div>
+                    </div>
+                  </div>
+                </label>
+
+                <label class="method-card">
+                  <input type="radio" name="proteinMethod" value="pdb" class="method-radio">
+                  <div class="method-content">
+                    <div class="method-icon">📄</div>
+                    <div class="method-info">
+                      <div class="method-title">PDB Files</div>
+                      <div class="method-desc">Require preparation</div>
+                    </div>
+                  </div>
+                </label>
+
+                <label class="method-card">
+                  <input type="radio" name="proteinMethod" value="pdbid" class="method-radio">
+                  <div class="method-content">
+                    <div class="method-icon">🔍</div>
+                    <div class="method-info">
+                      <div class="method-title">PDB Codes</div>
+                      <div class="method-desc">Automatic download</div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <!-- PDBQT Upload Area -->
+              <div id="pdbqtUploadArea" class="method-area" style="display: none;">
+                <div class="file-group">
+                  <label class="file-label" for="receptorPdbqt">
+                    <div class="file-icon">🧬</div>
+                    <div class="file-info">
+                      <span class="file-title">Upload PDBQT files</span>
+                      <span class="file-desc">You can select multiple files</span>
+                    </div>
+                  </label>
+                  <input type="file" id="receptorPdbqt" name="receptorPdbqt" multiple accept=".pdbqt" class="file-input">
+                  <div class="file-selected" id="receptorPdbqtSelected"></div>
+                </div>
+              </div>
+
+              <!-- PDB Upload Area -->
+              <div id="pdbUploadArea" class="method-area" style="display: none;">
+                <div class="file-group">
+                  <label class="file-label" for="receptorPdb">
+                    <div class="file-icon">📄</div>
+                    <div class="file-info">
+                      <span class="file-title">Upload PDB files</span>
+                      <span class="file-desc">You can select multiple files</span>
+                    </div>
+                  </label>
+                  <input type="file" id="receptorPdb" name="receptorPdb" multiple accept=".pdb" class="file-input">
+                  <div class="file-selected" id="receptorPdbSelected"></div>
+                </div>
+              </div>
+
+              <!-- PDB ID Input Area -->
+              <div id="pdbIdInputArea" class="method-area" style="display: none;">
+                <div class="input-group">
+                  <label for="pdbCodes">PDB Codes (comma-separated)</label>
+                  <textarea id="pdbCodes" placeholder="e.g: 1ABC, 2XYZ, 3DEF" rows="3" class="text-input"></textarea>
+                  <div class="help-text">💡 Enter one or more PDB codes separated by commas</div>
+                </div>
+              </div>
+
+              <div class="step-actions">
+                <button type="button" class="btn btn-secondary" disabled>← Previous</button>
+                <button type="button" class="btn btn-primary" id="step1Next">Next →</button>
+              </div>
+            </div>
+
+            <!-- Step 2: Protein Preparation -->
+            <div class="wizard-step" id="step2">
+              <div class="step-header">
+                <h3 class="step-title">⚙️ Step 2: Protein Preparation</h3>
+                <p class="step-description">Configure preparation options for your proteins</p>
+              </div>
+
+              <div id="preparationNeeded" style="display: none;">
+                <div class="info-box">
+                  <div class="info-icon">ℹ️</div>
+                  <div class="info-content">
+                    <strong>Automatic preparation</strong>
+                    <p>Selected proteins will be automatically prepared with mk_prepare_receptor</p>
+                  </div>
+                </div>
+
+                <div class="prep-options">
+                  <h4 class="subsection-title">Preparation options</h4>
+
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="prepRemoveWaters" checked>
+                    <span>Remove water molecules</span>
+                  </label>
+
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="prepAddHydrogens" checked>
+                    <span>Add hydrogens</span>
+                  </label>
+
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="prepRepairAtoms" checked>
+                    <span>Repair missing atoms</span>
+                  </label>
+
+                  <div class="advanced-prep-toggle">
+                    <button type="button" id="toggleAdvancedPrep" class="btn-link">
+                      <span id="advancedPrepIcon">▶</span> Advanced options
+                    </button>
+                  </div>
+
+                  <div id="advancedPrepOptions" style="display: none;">
+                    <div class="config-row">
+                      <div class="config-input">
+                        <label>pH</label>
+                        <input type="number" id="prepPH" step="0.1" value="7.4" class="text-input">
+                      </div>
+                      <div class="config-input">
+                        <label class="checkbox-label">
+                          <input type="checkbox" id="prepKeepHetero">
+                          <span>Keep heteroatoms</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="proteinSummary" class="summary-box">
+                  <strong>📋 Proteins to prepare:</strong>
+                  <div id="proteinList"></div>
+                </div>
+              </div>
+
+              <div id="preparationNotNeeded" style="display: none;">
+                <div class="success-box">
+                  <div class="success-icon">✅</div>
+                  <div class="success-content">
+                    <strong>Files ready</strong>
+                    <p>PDBQT files are already prepared and ready for docking</p>
+                  </div>
+                </div>
+                <div id="pdbqtSummary" class="summary-box"></div>
+              </div>
+
+              <div class="step-actions">
+                <button type="button" class="btn btn-secondary" id="step2Prev">← Previous</button>
+                <button type="button" class="btn btn-primary" id="step2Next">Next →</button>
+              </div>
+            </div>
+
+            <!-- Step 3: Configuration -->
+            <div class="wizard-step" id="step3">
+              <div class="step-header">
+                <h3 class="step-title">📐 Step 3: Docking Configuration</h3>
+                <p class="step-description">Define search parameters for molecular docking</p>
+              </div>
+
+              <div class="config-strategy-selector">
+                <h4 class="subsection-title">Configuration strategy</h4>
+
+                <label class="method-card">
+                  <input type="radio" name="configStrategy" value="single" class="method-radio" checked>
+                  <div class="method-content">
+                    <div class="method-icon">📄</div>
+                    <div class="method-info">
+                      <div class="method-title">Single config for all</div>
+                      <div class="method-desc">Same parameters for all proteins</div>
+                    </div>
+                  </div>
+                </label>
+
+                <label class="method-card">
+                  <input type="radio" name="configStrategy" value="multiple" class="method-radio">
+                  <div class="method-content">
+                    <div class="method-icon">📑</div>
+                    <div class="method-info">
+                      <div class="method-title">Per-protein config</div>
+                      <div class="method-desc">Specific parameters for each protein</div>
+                    </div>
+                  </div>
+                </label>
+              </div>
+
+              <!-- Single Config Area -->
+              <div id="singleConfigArea" class="config-area">
+                <div class="config-method-selector">
+                  <button type="button" class="config-method-btn active" data-method="manual">
+                    ⚙️ Manual
+                  </button>
+                  <button type="button" class="config-method-btn" data-method="upload">
+                    📤 Upload file
+                  </button>
+                </div>
+
+                <div id="manualConfigArea" class="config-input-area">
+                  <div class="config-form">
+                    <div class="config-row">
+                      <div class="config-input">
+                        <label>Center X</label>
+                        <input type="number" id="centerX" step="0.1" placeholder="102.901" class="text-input">
+                      </div>
+                      <div class="config-input">
+                        <label>Center Y</label>
+                        <input type="number" id="centerY" step="0.1" placeholder="114.945" class="text-input">
+                      </div>
+                      <div class="config-input">
+                        <label>Center Z</label>
+                        <input type="number" id="centerZ" step="0.1" placeholder="50.0" class="text-input">
+                      </div>
+                    </div>
+
+                    <div class="config-row">
+                      <div class="config-input">
+                        <label>Size X (Å)</label>
+                        <input type="number" id="sizeX" step="0.1" placeholder="20" class="text-input">
+                      </div>
+                      <div class="config-input">
+                        <label>Size Y (Å)</label>
+                        <input type="number" id="sizeY" step="0.1" placeholder="20" class="text-input">
+                      </div>
+                      <div class="config-input">
+                        <label>Size Z (Å)</label>
+                        <input type="number" id="sizeZ" step="0.1" placeholder="20" class="text-input">
+                      </div>
+                    </div>
+
+                    <div class="config-row">
+                      <div class="config-input">
+                        <label>Exhaustiveness</label>
+                        <input type="number" id="exhaustiveness" min="1" max="32" value="8" class="text-input">
+                      </div>
+                      <div class="config-input">
+                        <label>Scoring function</label>
+                        <select id="scoringFunction" class="text-input">
+                          <option value="vina">Vina (default)</option>
+                          <option value="vinardo">Vinardo</option>
+                          <option value="ad4">AD4</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div id="uploadConfigArea" class="config-input-area" style="display: none;">
+                  <div class="file-group">
+                    <label class="file-label" for="configAdvanced">
+                      <div class="file-icon">⚙️</div>
+                      <div class="file-info">
+                        <span class="file-title">Upload configuration file</span>
+                        <span class="file-desc">*.txt (format: key=value)</span>
+                      </div>
+                    </label>
+                    <input type="file" id="configAdvanced" name="configAdvanced" accept=".txt" class="file-input">
+                    <div class="file-selected" id="configAdvancedSelected"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Multiple Config Area -->
+              <div id="multipleConfigArea" class="config-area" style="display: none;">
+                <div class="info-box">
+                  <div class="info-icon">ℹ️</div>
+                  <div class="info-content">
+                    <strong>Per-protein configuration</strong>
+                    <p>Upload a configuration file for each protein or configure manually</p>
+                  </div>
+                </div>
+
+                <div class="config-method-selector">
+                  <button type="button" class="config-method-btn-multi active" data-method="upload-multi">
+                    📤 Upload files
+                  </button>
+                  <button type="button" class="config-method-btn-multi" data-method="manual-multi">
+                    ⚙️ Manual
+                  </button>
+                </div>
+
+                <div id="uploadMultiConfigArea" class="config-input-area">
+                  <div class="file-group">
+                    <label class="file-label" for="configMultiple">
+                      <div class="file-icon">📑</div>
+                      <div class="file-info">
+                        <span class="file-title">Upload configuration files</span>
+                        <span class="file-desc">One file per protein (auto-match by name)</span>
+                      </div>
+                    </label>
+                    <input type="file" id="configMultiple" name="configMultiple" multiple accept=".txt" class="file-input">
+                    <div class="file-selected" id="configMultipleSelected"></div>
+                  </div>
+                  <div class="help-text">💡 Files will be automatically matched with proteins by name</div>
+                </div>
+
+                <div id="manualMultiConfigArea" class="config-input-area" style="display: none;">
+                  <div id="perProteinConfigs"></div>
+                </div>
+              </div>
+
+              <div class="step-actions">
+                <button type="button" class="btn btn-secondary" id="step3Prev">← Previous</button>
+                <button type="button" class="btn btn-primary" id="step3Next">Next →</button>
+              </div>
+            </div>
+
+            <!-- Step 4: Ligands -->
+            <div class="wizard-step" id="step4">
+              <div class="step-header">
+                <h3 class="step-title">💊 Step 4: Ligand Selection</h3>
+                <p class="step-description">Choose ligands for molecular docking</p>
+              </div>
+
+              <div class="ligand-method-selector">
+                <button type="button" class="ligand-method-btn active" data-method="pdbqt">
+                  <div class="method-icon">💊</div>
+                  <div class="method-info">
+                    <div class="method-title">PDBQT (Ready)</div>
+                    <div class="method-desc">Already prepared for docking</div>
+                  </div>
+                </button>
+
+                <button type="button" class="ligand-method-btn" data-method="other">
+                  <div class="method-icon">🧪</div>
+                  <div class="method-info">
+                    <div class="method-title">Other Formats</div>
+                    <div class="method-desc">SMILES, SDF, MOL2 (will be prepared)</div>
+                  </div>
+                </button>
+              </div>
+
+              <!-- PDBQT Ligands Area -->
+              <div id="pdbqtLigandsArea" class="ligand-input-area">
+                <div class="file-group">
+                  <label class="file-label" for="ligandPdbqt">
+                    <div class="file-icon">💊</div>
+                    <div class="file-info">
+                      <span class="file-title">Upload PDBQT ligands</span>
+                      <span class="file-desc">You can select multiple files</span>
+                    </div>
+                  </label>
+                  <input type="file" id="ligandPdbqt" name="ligandPdbqt" multiple accept=".pdbqt" class="file-input">
+                  <div class="file-selected" id="ligandPdbqtSelected"></div>
+                </div>
+              </div>
+
+              <!-- Other Formats Ligands Area -->
+              <div id="otherLigandsArea" class="ligand-input-area" style="display: none;">
+                <div class="ligand-format-tabs">
+                  <button type="button" class="format-tab active" data-format="smiles">SMILES</button>
+                  <button type="button" class="format-tab" data-format="sdf">SDF</button>
+                  <button type="button" class="format-tab" data-format="mol2">MOL2</button>
+                </div>
+
+                <div class="format-content active" id="smilesContent">
+                  <div class="file-group">
+                    <label class="file-label" for="ligandSmiles">
+                      <div class="file-icon">🧪</div>
+                      <div class="file-info">
+                        <span class="file-title">Upload SMILES files</span>
+                        <span class="file-desc">*.smi, *.txt (will be converted to PDBQT)</span>
+                      </div>
+                    </label>
+                    <input type="file" id="ligandSmiles" name="ligandSmiles" multiple accept=".smi,.txt" class="file-input">
+                    <div class="file-selected" id="ligandSmilesSelected"></div>
+                  </div>
+                </div>
+
+                <div class="format-content" id="sdfContent">
+                  <div class="file-group">
+                    <label class="file-label" for="ligandSdf">
+                      <div class="file-icon">📦</div>
+                      <div class="file-info">
+                        <span class="file-title">Upload SDF files</span>
+                        <span class="file-desc">*.sdf (will be converted to PDBQT)</span>
+                      </div>
+                    </label>
+                    <input type="file" id="ligandSdf" name="ligandSdf" multiple accept=".sdf" class="file-input">
+                    <div class="file-selected" id="ligandSdfSelected"></div>
+                  </div>
+                </div>
+
+                <div class="format-content" id="mol2Content">
+                  <div class="file-group">
+                    <label class="file-label" for="ligandMol2">
+                      <div class="file-icon">🧬</div>
+                      <div class="file-info">
+                        <span class="file-title">Upload MOL2 files</span>
+                        <span class="file-desc">*.mol2 (will be converted to PDBQT)</span>
+                      </div>
+                    </label>
+                    <input type="file" id="ligandMol2" name="ligandMol2" multiple accept=".mol2" class="file-input">
+                    <div class="file-selected" id="ligandMol2Selected"></div>
+                  </div>
+                </div>
+
+                <div class="info-box">
+                  <div class="info-icon">⚙️</div>
+                  <div class="info-content">
+                    <strong>Automatic preparation</strong>
+                    <p>Ligands will be automatically converted to PDBQT format using mk_prepare_ligand</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Job Summary -->
+              <div id="jobSummary" class="job-summary-box">
+                <h4 class="subsection-title">📊 Job Summary</h4>
+                <div class="summary-grid">
+                  <div class="summary-item-grid">
+                    <span class="summary-label">Proteins:</span>
+                    <span id="summaryProteins" class="summary-value">0</span>
+                  </div>
+                  <div class="summary-item-grid">
+                    <span class="summary-label">Ligands:</span>
+                    <span id="summaryLigands" class="summary-value">0</span>
+                  </div>
+                  <div class="summary-item-grid">
+                    <span class="summary-label">Total jobs:</span>
+                    <span id="summaryJobs" class="summary-value">0</span>
+                  </div>
+                  <div class="summary-item-grid">
+                    <span class="summary-label">Estimated time:</span>
+                    <span id="summaryTime" class="summary-value">~0 min</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="step-actions">
+                <button type="button" class="btn btn-secondary" id="step4Prev">← Previous</button>
+                <button type="submit" class="btn btn-success" id="submitAdvanced">
+                  <span class="btn-icon">🚀</span>
+                  <span class="btn-text">Start Docking</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Action Buttons (Hidden - wizard handles submission) -->
+          <div class="button-group" style="display: none;">
+            <button type="submit" id="submitBtn" class="btn btn-primary">
+              <span class="btn-icon">🚀</span>
+              <span class="btn-text">Run Docking</span>
+            </button>
+            <button type="button" id="downloadBtn" class="btn btn-secondary" disabled>
+              <span class="btn-icon">📥</span>
+              <span class="btn-text">Download Results</span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Progress Section -->
+      <div id="progressSection" class="section" style="display: none;">
+        <h2 class="section-title">⏳ Docking Progress</h2>
+
+        <div class="progress-container">
+          <div class="progress-header">
+            <span id="progressTitle">Initializing...</span>
+            <span id="progressPercent" class="progress-percent">0%</span>
+          </div>
+          <div class="progress-bar-wrapper">
+            <div id="progressBar" class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+          </div>
+          <div class="progress-stats">
+            <div class="stat">
+              <span class="stat-label">Receptors:</span>
+              <span id="statReceptors" class="stat-value">0/0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Ligands per receptor:</span>
+              <span id="statLigands" class="stat-value">0</span>
+            </div>
+            <div class="stat">
+              <span class="stat-label">Time elapsed:</span>
+              <span id="statTime" class="stat-value">00:00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detailed Status -->
+        <div class="status-container">
+          <div class="status-header">
+            <span>📊 Current Status</span>
+          </div>
+          <div class="status-details">
+            <div class="status-item">
+              <div class="status-icon">🧬</div>
+              <div class="status-content">
+                <div class="status-label">Current Protein</div>
+                <div id="currentProtein" class="status-value">Waiting to start...</div>
+              </div>
+            </div>
+            <div class="status-item">
+              <div class="status-icon">💊</div>
+              <div class="status-content">
+                <div class="status-label">Current Ligand</div>
+                <div id="currentLigand" class="status-value">-</div>
+              </div>
+            </div>
+            <div class="status-item">
+              <div class="status-icon">⚙️</div>
+              <div class="status-content">
+                <div class="status-label">Processing Status</div>
+                <div id="processingStatus" class="status-value">Initializing docking process...</div>
+              </div>
+            </div>
+            <div class="status-item">
+              <div class="status-icon">📈</div>
+              <div class="status-content">
+                <div class="status-label">Overall Progress</div>
+                <div id="overallProgress" class="status-value">0 of 0 proteins completed</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results Section -->
+      <div id="resultsSection" class="section" style="display: none;">
+        <h2 class="section-title">✅ Docking Completed</h2>
+
+        <div class="results-summary">
+          <div class="summary-item success">
+            <span class="summary-icon">✓</span>
+            <div class="summary-text">
+              <span class="summary-title">Process Successful</span>
+              <span id="summaryDetails" class="summary-desc">All receptors processed</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="results-actions">
+          <button type="button" id="downloadResultsBtn" class="btn btn-primary">
+            <span class="btn-icon">📥</span>
+            <span class="btn-text">Download Results (.zip)</span>
+          </button>
+          <button type="button" id="newDockingBtn" class="btn btn-secondary">
+            <span class="btn-icon">🔄</span>
+            <span class="btn-text">New Docking</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Error Section -->
+      <div id="errorSection" class="section" style="display: none;">
+        <h2 class="section-title">❌ Error</h2>
+        <div class="error-message">
+          <span id="errorText"></span>
+        </div>
+        <button type="button" id="retryBtn" class="btn btn-secondary">
+          <span class="btn-icon">🔄</span>
+          <span class="btn-text">Try Again</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Use relative URL for API calls (works both locally and in production)
+    const API_URL = window.location.origin;
+    let lastResultsDir = null;
+    let startTime = null;
+    let timerInterval = null;
+    let currentSessionId = null;
+    let progressInterval = null;
+
+    // ==================== UI Elements ====================
+    const form = document.getElementById("form");
+    const uploadSection = document.getElementById("uploadSection");
+    const progressSection = document.getElementById("progressSection");
+    const resultsSection = document.getElementById("resultsSection");
+    const errorSection = document.getElementById("errorSection");
+
+    const submitBtn = document.getElementById("submitBtn");
+    const downloadBtn = document.getElementById("downloadBtn");
+    const downloadResultsBtn = document.getElementById("downloadResultsBtn");
+    const newDockingBtn = document.getElementById("newDockingBtn");
+    const retryBtn = document.getElementById("retryBtn");
+
+    const progressBar = document.querySelector(".progress-fill");
+    const progressPercent = document.getElementById("progressPercent");
+    const progressTitle = document.getElementById("progressTitle");
+    const statReceptors = document.getElementById("statReceptors");
+    const statLigands = document.getElementById("statLigands");
+    const statTime = document.getElementById("statTime");
+
+    // Status display elements
+    const currentProteinEl = document.getElementById("currentProtein");
+    const currentLigandEl = document.getElementById("currentLigand");
+    const processingStatusEl = document.getElementById("processingStatus");
+    const overallProgressEl = document.getElementById("overallProgress");
+
+    // ==================== Progress Management ====================
+    function startTimer() {
+      startTime = Date.now();
+      timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        statTime.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (timerInterval) clearInterval(timerInterval);
+    }
+
+    function updateProgress(current, total) {
+      const percent = Math.round((current / total) * 100);
+      console.log(`📊 Updating progress: ${current}/${total} = ${percent}%`);
+      console.log('📊 progressBar element:', progressBar);
+      console.log('📊 progressBar current width:', progressBar ? progressBar.style.width : 'NULL');
+
+      if (!progressBar) {
+        console.error('❌ ERROR: progressBar element not found!');
+        return;
+      }
+
+      progressBar.style.width = percent + '%';
+      progressPercent.textContent = percent + '%';
+      statReceptors.textContent = `${current}/${total}`;
+
+      console.log('📊 progressBar new width:', progressBar.style.width);
+      console.log('📊 progressPercent text:', progressPercent.textContent);
+    }
+
+    // Poll for progress updates
+    async function pollProgress(sessionId) {
+      try {
+        const res = await fetch(`${API_URL}/docking/progress/${sessionId}`);
+        if (!res.ok) {
+          console.error(`❌ Progress poll failed with status: ${res.status}`);
+          return;
+        }
+
+        const data = await res.json();
+        console.log('📊 Progress data received:', {
+          status: data.status,
+          proteinsProcessed: data.proteinsProcessed,
+          totalProteins: data.totalProteins,
+          currentProtein: data.currentProtein,
+          currentLigand: data.currentLigand,
+          results_dir: data.results_dir
+        });
+
+        // Update progress bar
+        updateProgress(data.proteinsProcessed, data.totalProteins);
+
+        // Store results directory
+        if (data.results_dir) {
+          lastResultsDir = data.results_dir;
+          console.log('📁 Results directory stored:', lastResultsDir);
+        }
+
+        // Update current protein
+        if (data.currentProtein) {
+          currentProteinEl.textContent = data.currentProtein;
+          progressTitle.textContent = `Processing: ${data.currentProtein}`;
+          console.log('🧬 Current protein:', data.currentProtein);
+        }
+
+        // Update current ligand
+        if (data.currentLigand) {
+          currentLigandEl.textContent = data.currentLigand;
+          console.log('💊 Current ligand:', data.currentLigand);
+        } else {
+          currentLigandEl.textContent = '-';
+        }
+
+        // Update overall progress
+        overallProgressEl.textContent = `${data.proteinsProcessed} of ${data.totalProteins} proteins completed`;
+
+        // Update processing status with detailed information
+        if (data.currentProtein && data.currentLigand) {
+          const statusText = `Docking ${data.currentLigand} against ${data.currentProtein}`;
+          processingStatusEl.textContent = statusText;
+          console.log('⚙️ Status:', statusText);
+        } else if (data.currentProtein) {
+          processingStatusEl.textContent = `Processing protein ${data.currentProtein}`;
+        } else if (data.proteinsProcessed === 0) {
+          processingStatusEl.textContent = 'Initializing docking process...';
+        } else {
+          processingStatusEl.textContent = 'Processing...';
+        }
+
+        // Check if process is complete
+        if (data.status === 'completed') {
+          console.log('🎉 DOCKING COMPLETED!');
+          console.log('📊 Final data:', {
+            status: data.status,
+            results_dir: data.results_dir,
+            lastResultsDir: lastResultsDir,
+            totalProteins: data.totalProteins,
+            totalLigands: data.totalLigands
+          });
+
+          clearInterval(progressInterval);
+          stopTimer();
+          updateProgress(data.totalProteins, data.totalProteins);
+
+          // Update final status
+          currentProteinEl.textContent = 'All proteins completed';
+          currentLigandEl.textContent = 'All ligands completed';
+          processingStatusEl.textContent = 'Docking process completed successfully!';
+          overallProgressEl.textContent = `${data.totalProteins} of ${data.totalProteins} proteins completed`;
+
+          console.log('✅ Docking completed! lastResultsDir:', lastResultsDir);
+
+          // Make sure we have the results directory
+          if (!lastResultsDir && data.results_dir) {
+            lastResultsDir = data.results_dir;
+            console.log('📁 Setting lastResultsDir from completion data:', lastResultsDir);
+          }
+
+          // Trigger automatic download IMMEDIATELY when progress reaches 100%
+          console.log('🚀 Progress reached 100%! Triggering automatic download...');
+          console.log('📁 lastResultsDir before download:', lastResultsDir);
+
+          // Download immediately (no delay)
+          setTimeout(async () => {
+            console.log('🎯 Calling downloadResults() function...');
+            try {
+              await downloadResults();
+              console.log('✅ downloadResults() completed successfully');
+            } catch (error) {
+              console.error('❌ Error in automatic download:', error);
+              console.error('❌ Error details:', {
+                message: error.message,
+                stack: error.stack,
+                lastResultsDir: lastResultsDir
+              });
+              alert('Automatic download failed: ' + error.message + '. Please click the Download button manually.');
+            }
+          }, 100); // Very short delay to ensure UI updates first
+
+          // Show results section after download starts
+          setTimeout(() => {
+            console.log('🔄 Showing results section...');
+            showSection('results');
+            document.getElementById('summaryDetails').textContent =
+              `${data.totalProteins} receptor(s) processed with ${data.totalLigands} ligand(s)`;
+          }, 500);
+        } else if (data.status === 'error') {
+          clearInterval(progressInterval);
+          stopTimer();
+
+          // Update error status
+          currentProteinEl.textContent = 'Error occurred';
+          currentLigandEl.textContent = '-';
+          processingStatusEl.textContent = 'Docking process failed';
+
+          showSection('error');
+          document.getElementById('errorText').textContent = 'The docking process ended with an error. Please check your input files and try again.';
+        }
+      } catch (err) {
+        console.error('Error polling progress:', err);
+      }
+    }
+
+    function showSection(section) {
+      console.log(`🔄 Switching to section: ${section}`);
+      uploadSection.style.display = section === 'upload' ? 'block' : 'none';
+      progressSection.style.display = section === 'progress' ? 'block' : 'none';
+      resultsSection.style.display = section === 'results' ? 'block' : 'none';
+      errorSection.style.display = section === 'error' ? 'block' : 'none';
+      console.log(`✅ Section visibility - upload: ${uploadSection.style.display}, progress: ${progressSection.style.display}, results: ${resultsSection.style.display}, error: ${errorSection.style.display}`);
+    }
+
+    // ==================== Form Submission ====================
+    form.addEventListener("submit", async e => {
+      e.preventDefault();
+
+      // Validation is handled by wizard
+      // Count files from wizard
+      let receptorCount = 0;
+      receptorCount += (document.getElementById('receptorPdbqt')?.files.length || 0);
+      receptorCount += (document.getElementById('receptorPdb')?.files.length || 0);
+
+      // Count PDB IDs
+      const pdbCodes = document.getElementById('pdbCodes')?.value.trim();
+      if (pdbCodes) {
+        receptorCount += pdbCodes.split(',').filter(c => c.trim()).length;
+      }
+
+      let ligandCount = 0;
+      ligandCount += (document.getElementById('ligandPdbqt')?.files.length || 0);
+      ligandCount += (document.getElementById('ligandSmiles')?.files.length || 0);
+      ligandCount += (document.getElementById('ligandSdf')?.files.length || 0);
+      ligandCount += (document.getElementById('ligandMol2')?.files.length || 0);
+
+      const configCount = receptorCount; // Assume one config per receptor for now
+
+      // Show progress section
+      showSection('progress');
+      submitBtn.disabled = true;
+      downloadBtn.disabled = true;
+
+      // Initialize status display
+      currentProteinEl.textContent = 'Waiting to start...';
+      currentLigandEl.textContent = '-';
+      processingStatusEl.textContent = 'Uploading files to server...';
+      overallProgressEl.textContent = `0 of ${receptorCount} proteins completed`;
+
+      statLigands.textContent = ligandCount;
+      updateProgress(0, receptorCount);
+      startTimer();
+
+      try {
+        const formData = new FormData(form);
+
+        const res = await fetch(`${API_URL}/docking/run`, {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          const errorMsg = data.error || `Server error: ${res.status}`;
+          throw new Error(errorMsg);
+        }
+
+        // Store session ID and start polling
+        currentSessionId = data.sessionId;
+        lastResultsDir = data.results_dir;
+
+        processingStatusEl.textContent = 'Docking started, processing proteins...';
+
+        // Start polling for progress every 500ms
+        progressInterval = setInterval(() => {
+          pollProgress(currentSessionId);
+        }, 500);
+
+        // Wait a bit for the process to complete
+        // The polling will continue until we manually stop it
+
+      } catch (err) {
+        stopTimer();
+        if (progressInterval) clearInterval(progressInterval);
+
+        currentProteinEl.textContent = 'Error occurred';
+        currentLigandEl.textContent = '-';
+        processingStatusEl.textContent = `Error: ${err.message}`;
+
+        showSection('error');
+        document.getElementById('errorText').textContent = err.message;
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+
+    // ==================== Download Handlers ====================
+    async function downloadResults() {
+      console.log('📥 Download requested. lastResultsDir:', lastResultsDir);
+
+      if (!lastResultsDir) {
+        console.error('❌ No lastResultsDir set!');
+        alert("Please run docking first. No results directory found.");
+        return;
+      }
+
+      // Update button state if it exists (for manual downloads)
+      if (downloadResultsBtn) {
+        console.log('✅ downloadResultsBtn found, disabling button...');
+        downloadResultsBtn.disabled = true;
+        downloadResultsBtn.innerHTML = '<span class="btn-icon">⏳</span><span class="btn-text">Downloading...</span>';
+      } else {
+        console.log('ℹ️ downloadResultsBtn not found (automatic download mode)');
+      }
+
+      try {
+        console.log('📥 Sending download request for:', lastResultsDir);
+        const res = await fetch(`${API_URL}/docking/download`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ results_dir: lastResultsDir })
+        });
+
+        if (!res.ok) {
+          const errorText = await res.text();
+          console.error('❌ Download failed:', res.status, errorText);
+          throw new Error(`Download failed: ${res.status} - ${errorText}`);
+        }
+
+        console.log('✅ Response received, status:', res.status);
+        console.log('📦 Content-Type:', res.headers.get('Content-Type'));
+        console.log('📦 Content-Disposition:', res.headers.get('Content-Disposition'));
+
+        const blob = await res.blob();
+        console.log('📦 Blob received, size:', blob.size, 'bytes', 'type:', blob.type);
+
+        if (blob.size === 0) {
+          throw new Error('Received empty file from server');
+        }
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `results_${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(a);
+        console.log('🖱️ Triggering download...');
+        a.click();
+
+        // Clean up after a short delay
+        setTimeout(() => {
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+          console.log('🧹 Cleanup complete');
+        }, 100);
+
+        console.log('✅ File downloaded successfully');
+      } catch (err) {
+        console.error('❌ Download error:', err);
+        alert("Error downloading results: " + err.message);
+      } finally {
+        // Restore button state if it exists
+        if (downloadResultsBtn) {
+          downloadResultsBtn.disabled = false;
+          downloadResultsBtn.innerHTML = '<span class="btn-icon">📥</span><span class="btn-text">Download Results</span>';
+        }
+      }
+    }
+
+    downloadBtn.addEventListener("click", downloadResults);
+    downloadResultsBtn.addEventListener("click", downloadResults);
+
+    // ==================== Action Buttons ====================
+    newDockingBtn.addEventListener("click", () => {
+      form.reset();
+      lastResultsDir = null;
+      showSection('upload');
+      submitBtn.disabled = false;
+      downloadBtn.disabled = true;
+    });
+
+    retryBtn.addEventListener("click", () => {
+      showSection('upload');
+      submitBtn.disabled = false;
+    });
+
+    // ==================== Initial State ====================
+    showSection('upload');
+  </script>
+  <script src="wizard.js"></script>
+</body>
+</html>
