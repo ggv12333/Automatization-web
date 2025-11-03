@@ -17,9 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Cleaned up repository (removed test files)
 - Updated .gitignore to include package-lock.json
+- **Refactored logging**: Replaced all `console.log/error/warn` with structured logger in `docking.js`
+  - 36 console statements replaced with Winston logger
+  - Added requestId and sessionId context to all log messages
+  - Improved log levels (debug/info/warn/error)
 
 ### Fixed
 - Improved file structure documentation
+- Better traceability with structured logging
 
 ## [1.0.0] - 2024-10-28
 
