@@ -1,5 +1,5 @@
 // ==================== Global Variables ====================
-const API_URL = window.API_URL || "http://localhost:3000";
+const API_URL = window.API_URL || "http://localhost:8080";
 let currentMode = 'traditional';
 let currentSessionId = null;
 let lastResultsDir = null;

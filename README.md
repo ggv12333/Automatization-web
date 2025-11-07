@@ -17,12 +17,14 @@ A modern web-based automation platform for running AutoDock Vina molecular docki
 - **⚡ Parallel Execution**: Multi-threaded ligand processing for faster results
 - **📦 Automatic Downloads**: Results automatically download when docking completes
 - **🎨 Modern UI**: Clean, responsive wizard interface with progress visualization
-- **🔄 Session Management**: Track multiple docking sessions independently
+- **🔄 Session Management**: Track multiple docking sessions independently (2-hour timeout)
 - **🔒 Security**: Rate limiting, input validation, file sanitization, and structured logging
 - **🔧 Advanced Mode**: Support for PDB download, ligand preparation, and interactive configuration
 - **🐳 Docker Ready**: Fully containerized with Miniconda and AutoDock Vina pre-installed
+- **📚 API Documentation**: Interactive Swagger/OpenAPI documentation at `/api-docs`
+- **✅ Tested**: Comprehensive unit and integration tests with Jest
+- **⚡ Optimized**: Gzip compression for faster response times
 
----
 
 ## 🏗️ Architecture
 

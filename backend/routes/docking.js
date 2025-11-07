@@ -30,16 +30,23 @@ const __dirname = path.dirname(__filename);
 const progressMap = new Map();
 
 // Cleanup old progress entries every 10 minutes
+// Use environment variable or default to 2 hours
+const SESSION_TIMEOUT = parseInt(process.env.SESSION_TIMEOUT) || 2 * 60 * 60 * 1000; // 2 hours
+const CLEANUP_INTERVAL = parseInt(process.env.SESSION_CLEANUP_INTERVAL) || 10 * 60 * 1000; // 10 minutes
+
 setInterval(() => {
   const now = Date.now();
   for (const [sessionId, data] of progressMap.entries()) {
-    // Remove entries older than 30 minutes
-    if (data.createdAt && (now - data.createdAt) > 30 * 60 * 1000) {
+    // Remove entries older than SESSION_TIMEOUT (default: 2 hours)
+    if (data.createdAt && (now - data.createdAt) > SESSION_TIMEOUT) {
       progressMap.delete(sessionId);
-      logger.debug(`Cleaned up old progress entry: ${sessionId}`);
+      logger.debug(`Cleaned up old progress entry: ${sessionId}`, {
+        age: Math.round((now - data.createdAt) / 1000 / 60),
+        timeout: Math.round(SESSION_TIMEOUT / 1000 / 60)
+      });
     }
   }
-}, 10 * 60 * 1000);
+}, CLEANUP_INTERVAL);
 
 // Configuración de multer para subir archivos
 const uploadPath = process.env.UPLOAD_PATH || path.join(__dirname, "../uploads");

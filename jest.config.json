@@ -1,0 +1,21 @@
+{
+  "testEnvironment": "node",
+  "transform": {},
+  "extensionsToTreatAsEsm": [".js"],
+  "moduleNameMapper": {
+    "^(\\.{1,2}/.*)\\.js$": "$1"
+  },
+  "testMatch": [
+    "**/__tests__/**/*.test.js",
+    "**/?(*.)+(spec|test).js"
+  ],
+  "collectCoverageFrom": [
+    "backend/**/*.js",
+    "!backend/node_modules/**",
+    "!backend/**/*.test.js",
+    "!backend/**/*.spec.js"
+  ],
+  "coverageDirectory": "coverage",
+  "coverageReporters": ["text", "lcov", "html"],
+  "verbose": true
+}

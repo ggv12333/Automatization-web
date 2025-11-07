@@ -8,17 +8,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- GitHub Actions CI/CD pipeline
-- Issue and Pull Request templates
-- MIT License
+- **Comprehensive testing suite**: Jest with 45+ unit and integration tests
+- **API Documentation**: OpenAPI/Swagger UI at `/api-docs`
+- **Custom error handling**: Better error classes and messages
+- **Performance optimizations**: Gzip compression middleware
+- **.env.example**: Environment variable documentation
+- **IMPLEMENTATION_SUMMARY.md**: Detailed improvement documentation
 - CHANGELOG.md for version tracking
-- Improved documentation in README.md
-- **Complete molecule preparation system**:
-  - Command-line interface for `prepare_molecules.py`
+- **Session timeout**: Extended from 30 minutes to 2 hours
+- **Error middleware**: Enhanced with custom error support
   - Automatic PDB download and preparation
-  - PDB → PDBQT conversion for receptors
-  - SMILES/SDF/MOL2 → PDBQT conversion for ligands
-  - Full integration in advanced mode docking flow
+- **API URL mismatch**: Frontend now correctly points to port 8080
+- **Session cleanup**: Long docking processes no longer lose progress
 - QUICK_START.md guide for easy project execution
 - run.sh automation script
 - MOLECULE_PREPARATION.md comprehensive documentation
