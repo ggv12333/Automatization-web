@@ -1,8 +1,11 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
 import path from "path";
 import { fileURLToPath } from "url";
+import { readFileSync } from "fs";
+import swaggerUi from "swagger-ui-express";
 import dockingRoutes from "./routes/docking.js";
 import downloadRoutes from "./routes/download.js";
 import logger from "./utils/logger.js";
@@ -21,6 +24,11 @@ logger.info("🟢 Starting server...");
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load Swagger documentation
+const swaggerDocument = JSON.parse(
+  readFileSync(path.join(__dirname, "../swagger.json"), "utf8")
+);
 
 const app = express();
 
@@ -71,6 +79,17 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID']
 }));
 
+// Compression middleware (should be early in the chain)
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6 // Compression level (0-9, 6 is default)
+}));
+
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -82,6 +101,12 @@ app.use(securityHeaders);
 
 // Rate limiting for API routes
 app.use('/docking', apiLimiter);
+
+// API Documentation (Swagger UI)
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: "AutoDock Vina API Docs"
+}));
 
 // Servir frontend como archivos estáticos
 app.use(express.static(path.join(__dirname, "../frontend")));

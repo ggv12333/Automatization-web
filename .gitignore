@@ -65,6 +65,13 @@ backend/uploads/*
 docker-compose.override.yml
 
 # ===========================
+# Testing
+# ===========================
+coverage/
+.nyc_output/
+*.lcov
+
+# ===========================
 # Logs
 # ===========================
 logs/

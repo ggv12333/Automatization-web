@@ -1,0 +1,536 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AutoDock Vina - Molecular Docking API",
+    "description": "REST API for automating AutoDock Vina molecular docking simulations with batch processing, real-time progress tracking, and result downloads.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support",
+      "url": "https://github.com/ggv12333/Automatization-web"
+    },
+    "license": {
+      "name": "MIT",
+      "url": "https://opensource.org/licenses/MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    },
+    {
+      "url": "https://your-domain.com",
+      "description": "Production server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Docking",
+      "description": "Molecular docking operations"
+    },
+    {
+      "name": "Download",
+      "description": "Result file downloads"
+    },
+    {
+      "name": "Health",
+      "description": "Service health checks"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check endpoint",
+        "description": "Returns the current health status of the server",
+        "responses": {
+          "200": {
+            "description": "Server is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readiness": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Readiness check endpoint",
+        "description": "Returns whether the server is ready to accept requests",
+        "responses": {
+          "200": {
+            "description": "Server is ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Server is not ready"
+          }
+        }
+      }
+    },
+    "/docking/run": {
+      "post": {
+        "tags": ["Docking"],
+        "summary": "Start a docking process",
+        "description": "Upload proteins, ligands, and configuration to start molecular docking",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/DockingRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Docking started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DockingStartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded"
+          }
+        }
+      }
+    },
+    "/docking/progress/{sessionId}": {
+      "get": {
+        "tags": ["Docking"],
+        "summary": "Get docking progress",
+        "description": "Poll the progress of a running docking session",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "UUID of the docking session",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProgressResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid session ID"
+          },
+          "404": {
+            "description": "Session not found"
+          }
+        }
+      }
+    },
+    "/docking/download-pdb": {
+      "post": {
+        "tags": ["Docking"],
+        "summary": "Download PDB file",
+        "description": "Download a protein structure from RCSB PDB database",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["pdbCode"],
+                "properties": {
+                  "pdbCode": {
+                    "type": "string",
+                    "pattern": "^[0-9][A-Z0-9]{3}$",
+                    "example": "1ABC",
+                    "description": "4-character PDB code"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PDB downloaded successfully"
+          },
+          "400": {
+            "description": "Invalid PDB code"
+          }
+        }
+      }
+    },
+    "/docking/validate-config": {
+      "post": {
+        "tags": ["Docking"],
+        "summary": "Validate docking configuration",
+        "description": "Validate docking parameters before starting",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DockingConfig"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Configuration is valid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "valid": {
+                      "type": "boolean"
+                    },
+                    "errors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Configuration is invalid"
+          }
+        }
+      }
+    },
+    "/download/results/{sessionId}/{filename}": {
+      "get": {
+        "tags": ["Download"],
+        "summary": "Download result file",
+        "description": "Download a specific result file from a docking session",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "UUID of the docking session",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "description": "Name of the file to download",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File download",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid parameters"
+          },
+          "404": {
+            "description": "File not found"
+          }
+        }
+      }
+    },
+    "/download/zip/{sessionId}": {
+      "get": {
+        "tags": ["Download"],
+        "summary": "Download all results as ZIP",
+        "description": "Download all result files from a docking session as a ZIP archive",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "in": "path",
+            "required": true,
+            "description": "UUID of the docking session",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ZIP file download",
+            "content": {
+              "application/zip": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Session not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "healthy"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uptime": {
+            "type": "number",
+            "description": "Server uptime in seconds"
+          },
+          "environment": {
+            "type": "object",
+            "properties": {
+              "node_version": {
+                "type": "string"
+              },
+              "python_path": {
+                "type": "string"
+              },
+              "vina_path": {
+                "type": "string"
+              }
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ReadinessResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["ready", "not ready"]
+          },
+          "checks": {
+            "type": "object"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "DockingRequest": {
+        "type": "object",
+        "required": ["proteins", "ligands", "proteinSource", "configStrategy"],
+        "properties": {
+          "proteins": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "description": "Protein files (PDBQT or PDB)"
+          },
+          "ligands": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "binary"
+            },
+            "description": "Ligand files (PDBQT, SDF, MOL2, etc.)"
+          },
+          "configs": {
+            "type": "string",
+            "format": "binary",
+            "description": "Configuration file (optional)"
+          },
+          "proteinSource": {
+            "type": "string",
+            "enum": ["pdbqt", "pdb", "pdbid"],
+            "description": "Source of protein input"
+          },
+          "configStrategy": {
+            "type": "string",
+            "enum": ["single", "multiple", "interactive"],
+            "description": "Configuration strategy"
+          }
+        }
+      },
+      "DockingStartResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string",
+            "example": "Docking started successfully"
+          },
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "resultsDir": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "ProgressResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["running", "completed", "error"]
+          },
+          "message": {
+            "type": "string"
+          },
+          "progress": {
+            "type": "object",
+            "properties": {
+              "current": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "percentage": {
+                "type": "number"
+              }
+            }
+          },
+          "resultsDir": {
+            "type": "string"
+          },
+          "proteins": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      },
+      "DockingConfig": {
+        "type": "object",
+        "required": ["center_x", "center_y", "center_z", "size_x", "size_y", "size_z"],
+        "properties": {
+          "center_x": {
+            "type": "string",
+            "example": "10.5",
+            "description": "X coordinate of search box center"
+          },
+          "center_y": {
+            "type": "string",
+            "example": "-5.2",
+            "description": "Y coordinate of search box center"
+          },
+          "center_z": {
+            "type": "string",
+            "example": "0.0",
+            "description": "Z coordinate of search box center"
+          },
+          "size_x": {
+            "type": "string",
+            "example": "20",
+            "description": "Size of search box in X dimension (Å)"
+          },
+          "size_y": {
+            "type": "string",
+            "example": "20",
+            "description": "Size of search box in Y dimension (Å)"
+          },
+          "size_z": {
+            "type": "string",
+            "example": "20",
+            "description": "Size of search box in Z dimension (Å)"
+          },
+          "exhaustiveness": {
+            "type": "string",
+            "example": "8",
+            "description": "Exhaustiveness of search (1-100)"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "details": {
+                "type": "object"
+              },
+              "timestamp": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          },
+          "requestId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      }
+    }
+  }
+}

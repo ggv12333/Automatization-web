@@ -110,7 +110,7 @@ export function validateDockingConfig(config) {
   if (config.exhaustiveness !== undefined) {
     const exh = parseInt(config.exhaustiveness);
     if (isNaN(exh) || exh < 1 || exh > 32) {
-      errors.push(`Exhaustiveness must be an integer between 1 and 32: ${config.exhaustiveness}`);
+      errors.push(`exhaustiveness must be an integer between 1 and 32: ${config.exhaustiveness}`);
     }
   }
   
@@ -155,7 +155,7 @@ export function isSafePath(filePath) {
  * @returns {boolean} - True if valid
  */
 export function isValidMode(mode) {
-  const validModes = ['traditional', 'advanced'];
+  const validModes = ['traditional', 'advanced', 'wizard'];
   return validModes.includes(mode);
 }
 

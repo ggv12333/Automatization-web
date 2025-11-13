@@ -258,14 +258,36 @@ export function errorHandler(err, req, res, next) {
     });
   }
   
+  // Custom application errors
+  if (err.isOperational) {
+    return res.status(err.statusCode || 500).json({
+      error: {
+        message: err.message,
+        name: err.name,
+        details: err.details,
+        timestamp: err.timestamp
+      },
+      requestId: req.id
+    });
+  }
+  
+  // Log non-operational errors (programming errors)
+  logger.error('Non-operational error', {
+    error: err.message,
+    stack: err.stack,
+    requestId: req.id
+  });
+  
   // Default error response
   const statusCode = err.statusCode || 500;
-  const message = process.env.NODE_ENV === 'production' 
-    ? 'Internal server error' 
-    : err.message;
+  const isProduction = process.env.NODE_ENV === 'production';
   
   res.status(statusCode).json({
-    error: message,
+    error: {
+      message: isProduction ? 'Internal server error' : err.message,
+      name: err.name || 'Error',
+      ...(isProduction ? {} : { stack: err.stack })
+    },
     requestId: req.id
   });
 }
