@@ -5,9 +5,11 @@
 import request from 'supertest';
 import express from 'express';
 import dockingRoutes from '../../routes/docking.js';
+import { requestIdMiddleware } from '../../middleware/security.js';
 
 // Create test app
 const app = express();
+app.use(requestIdMiddleware);
 app.use(express.json());
 app.use('/docking', dockingRoutes);
 

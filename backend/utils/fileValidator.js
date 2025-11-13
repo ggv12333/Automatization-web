@@ -243,7 +243,15 @@ function validateConfigContent(content) {
  * Get allowed extensions for a file type
  */
 export function getAllowedExtensions(fileType) {
-  return ALLOWED_EXTENSIONS[fileType] || [];
+  if (ALLOWED_EXTENSIONS[fileType]) {
+    return ALLOWED_EXTENSIONS[fileType];
+  }
+  // Return all unique extensions for unknown types
+  const allExtensions = new Set();
+  Object.values(ALLOWED_EXTENSIONS).forEach(exts => {
+    exts.forEach(ext => allExtensions.add(ext));
+  });
+  return Array.from(allExtensions);
 }
 
 /**
@@ -251,5 +259,38 @@ export function getAllowedExtensions(fileType) {
  */
 export function getMaxFileSize(fileType) {
   return MAX_FILE_SIZES[fileType] || MAX_FILE_SIZES.default;
+}
+
+/**
+ * Check if content appears to be a text-based molecular file
+ * @param {string} content - File content to check
+ * @returns {boolean} - True if it appears to be a molecular file
+ */
+export function isTextBasedMolecularFile(content) {
+  // Handle invalid input
+  if (!content || typeof content !== 'string') {
+    return false;
+  }
+
+  // Check for null bytes (binary files)
+  if (content.includes('\0')) {
+    return false;
+  }
+
+  // Check for molecular file markers
+  const molecularMarkers = [
+    /^HEADER/m,          // PDB header
+    /^ATOM\s+\d+/m,      // PDB/PDBQT atom line
+    /^HETATM/m,          // PDB heteroatom
+    /^@<TRIPOS>/m,       // MOL2 format
+    /V2000|V3000/,       // SDF format
+    /^M\s+END/m,         // SDF end marker
+    /receptor\s*=/i,     // Config file
+    /ligand\s*=/i,       // Config file
+    /center_[xyz]\s*=/i, // Config file
+    /exhaustiveness\s*=/i // Config file
+  ];
+
+  return molecularMarkers.some(pattern => pattern.test(content));
 }
 

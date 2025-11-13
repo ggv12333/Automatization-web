@@ -214,6 +214,37 @@ router.post("/download-pdb", uploadLimiter, async (req, res) => {
   }
 });
 
+// Route to validate docking configuration
+router.post("/validate-config", async (req, res) => {
+  try {
+    const config = req.body;
+    const validation = validateDockingConfig(config);
+    
+    if (validation.valid) {
+      return res.status(200).json({
+        valid: true,
+        errors: [],
+        requestId: req.id
+      });
+    } else {
+      return res.status(400).json({
+        valid: false,
+        errors: validation.errors,
+        requestId: req.id
+      });
+    }
+  } catch (error) {
+    logger.error('Config validation error', { 
+      error: error.message, 
+      requestId: req.id 
+    });
+    return res.status(500).json({
+      error: 'Failed to validate configuration',
+      requestId: req.id
+    });
+  }
+});
+
 // Route to prepare ligands from various formats
 router.post("/prepare-ligands", uploadLimiter, upload.fields([
   { name: "ligandSmiles" },
