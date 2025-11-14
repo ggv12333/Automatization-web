@@ -1,0 +1,52 @@
+# Lightweight development Dockerfile
+# Purpose: fast local builds for development and CI quick checks.
+# This image uses official Node and provides the same app runtime but without Conda/Vina installs.
+
+FROM node:18-bullseye-slim
+
+# Create app directory
+WORKDIR /app
+
+# Copy only necessary files
+COPY backend/ ./backend
+COPY frontend/ ./frontend
+# Copy top-level swagger.json if present (server expects /app/swagger.json)
+COPY swagger.json ./swagger.json
+
+# Create safe shims for reduce and scrub.py (development placeholders)
+RUN mkdir -p /usr/local/bin && \
+    cat > /usr/local/bin/reduce <<'EOF' && \
+    cat > /usr/local/bin/scrub.py <<'EOF2' && \
+    chmod +x /usr/local/bin/reduce /usr/local/bin/scrub.py
+#!/bin/sh
+# reduce shim: echo the input (simulate adding hydrogens)
+if [ -z "$1" ]; then
+    cat
+else
+    cat "$1"
+fi
+EOF
+#!/usr/bin/env python3
+import sys, shutil
+# scrub.py shim: copy input to output (no-op)
+if len(sys.argv) >= 3:
+    shutil.copy2(sys.argv[1], sys.argv[2])
+else:
+    with open(sys.argv[1],'rb') as f:
+        sys.stdout.buffer.write(f.read())
+EOF2
+
+# Install Node dependencies in backend
+RUN cd backend && npm ci --silent --no-audit --no-fund
+
+# Create upload/workdir and non-root user
+RUN mkdir -p /app/backend/uploads /tmp/workdir && \
+    useradd -m appuser || true && chown -R appuser:appuser /app /app/backend/uploads /tmp/workdir
+USER appuser
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+CMD ["node", "backend/server.js"]
