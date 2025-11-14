@@ -154,9 +154,26 @@ def validate_paths(config):
     # Validar que Vina esté disponible
     vina_exec = os.environ.get("VINA_PATH", "vina")
     try:
-        result = subprocess.run([vina_exec, "--help"], capture_output=True, text=True, timeout=5)
+        # First try --version for newer vina builds, fall back to --help
+        try:
+            result = subprocess.run([vina_exec, "--version"], capture_output=True, text=True, timeout=5)
+        except Exception:
+            result = subprocess.run([vina_exec, "--help"], capture_output=True, text=True, timeout=5)
+
         if result.returncode != 0:
             errors.append(f"AutoDock Vina no está disponible en: {vina_exec}")
+        else:
+            # Try to detect version (if present) and warn if older than 1.2
+            out = (result.stdout or result.stderr or "").strip()
+            import re
+            m = re.search(r"[Vv]ina\s*([0-9]+\.[0-9]+)", out)
+            if m:
+                try:
+                    ver = float(m.group(1))
+                    if ver < 1.2:
+                        print(f"⚠️  Detected AutoDock Vina version {ver}. Consider upgrading to the latest Vina (>=1.2) for improved performance.")
+                except Exception:
+                    pass
     except FileNotFoundError:
         errors.append(f"AutoDock Vina no encontrado en: {vina_exec}")
     except Exception as e:
