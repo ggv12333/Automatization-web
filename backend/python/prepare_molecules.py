@@ -38,6 +38,11 @@ class MoleculePreparator:
     def __init__(self, output_dir: str = "/tmp"):
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        # External tool paths (can be overridden via env)
+        # reduce: MolProbity reduce executable for adding hydrogens to proteins
+        self.reduce_exec = os.environ.get('REDUCE_PATH', 'reduce')
+        # scrub.py: external protonation/tautomerization script for ligands
+        self.scrub_exec = os.environ.get('SCRUB_PY_PATH', 'scrub.py')
     
     def download_pdb(self, pdb_code: str) -> Optional[Path]:
         """Download PDB file from RCSB"""
@@ -67,14 +72,31 @@ class MoleculePreparator:
         
         try:
             print(f"🔧 Preparing receptor: {pdb_path.name}...", flush=True)
-            
-            # Try using mk_prepare_receptor.py
+
+            # First, attempt to run reduce to add hydrogens (if available)
+            reduced_pdb = self.output_dir / f"{pdb_path.stem}_reduced.pdb"
+            try:
+                print(f"🧪 Running reduce ({self.reduce_exec}) to add hydrogens...", flush=True)
+                # reduce typically writes stdout with the new PDB content
+                proc = subprocess.run([self.reduce_exec, str(pdb_path)], capture_output=True, text=True, check=True)
+                with open(reduced_pdb, 'w') as f:
+                    f.write(proc.stdout)
+                print(f"✅ reduce completed, wrote: {reduced_pdb}", flush=True)
+                pdb_to_use = reduced_pdb
+            except FileNotFoundError:
+                print(f"⚠️  reduce not found at {self.reduce_exec}, skipping hydrogen addition", flush=True)
+                pdb_to_use = pdb_path
+            except subprocess.CalledProcessError as e:
+                print(f"⚠️  reduce failed: {e}. Continuing with original PDB", flush=True)
+                pdb_to_use = pdb_path
+
+            # Now call mk_prepare_receptor.py on the (possibly reduced) PDB
             cmd = [
                 'mk_prepare_receptor.py',
-                '-r', str(pdb_path),
+                '-r', str(pdb_to_use),
                 '-o', str(pdbqt_path)
             ]
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             print(f"✅ Receptor prepared: {pdbqt_path}", flush=True)
             return pdbqt_path
@@ -130,14 +152,30 @@ class MoleculePreparator:
         
         try:
             print(f"🔧 Preparing ligand: {input_path.name}...", flush=True)
-            
-            # Use mk_prepare_ligand.py
+
+            # Optional: run scrub.py to add hydrogens/protonate/tautomerize if available
+            preprocessed_input = input_path
+            try:
+                # Only run scrub for typical molecule formats
+                if input_path.suffix.lower() in ['.sdf', '.mol2', '.smi', '.smiles']:
+                    scrub_out = self.output_dir / f"{input_path.stem}_scrubbed{input_path.suffix}"
+                    print(f"🧪 Running scrub ({self.scrub_exec}) on {input_path.name}...", flush=True)
+                    proc = subprocess.run([self.scrub_exec, str(input_path), str(scrub_out)], capture_output=True, text=True, check=True)
+                    if scrub_out.exists():
+                        preprocessed_input = scrub_out
+                        print(f"✅ scrub completed, wrote: {scrub_out}", flush=True)
+            except FileNotFoundError:
+                print(f"⚠️  scrub.py not found at {self.scrub_exec}, skipping ligand protonation", flush=True)
+            except subprocess.CalledProcessError as e:
+                print(f"⚠️  scrub.py failed: {e}. Continuing with original ligand file", flush=True)
+
+            # Use mk_prepare_ligand.py on the (possibly preprocessed) input
             cmd = [
                 'mk_prepare_ligand.py',
-                '-i', str(input_path),
+                '-i', str(preprocessed_input),
                 '-o', str(pdbqt_path)
             ]
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True, check=True)
             print(f"✅ Ligand prepared: {pdbqt_path}", flush=True)
             return pdbqt_path

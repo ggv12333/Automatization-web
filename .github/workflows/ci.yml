@@ -12,6 +12,36 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
+    - name: Provide fake external tools for tests (vina/reduce/scrub)
+      run: |
+        mkdir -p ./tools/bin
+        cat > ./tools/bin/vina <<'EOF'
+        #!/bin/sh
+        # Minimal Vina shim for CI tests: respond to --version and run silently
+        if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+          echo "AutoDock Vina 1.2.5"
+          exit 0
+        fi
+        # For actual docking runs this is a no-op stub
+        echo "Vina shim called: $@" >&2
+        exit 0
+        EOF
+        cat > ./tools/bin/reduce <<'EOF'
+        #!/bin/sh
+        # Minimal reduce shim: output input to stdout (simulate adding hydrogens)
+        if [ -t 1 ]; then
+          cat "$1"
+        else
+          cat "$1"
+        fi
+        EOF
+        cat > ./tools/bin/scrub.py <<'EOF'
+        #!/bin/sh
+        # Minimal scrub shim: copy input to output (no-op preprocessing)
+        cp "$1" "$2"
+        EOF
+        chmod +x ./tools/bin/*
+        echo "PATH=$(pwd)/tools/bin:$PATH" >> $GITHUB_ENV
     
     - name: Setup Node.js
       uses: actions/setup-node@v4

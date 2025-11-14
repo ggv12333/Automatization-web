@@ -97,6 +97,11 @@ export PORT=8080
 export PYTHON_PATH=/usr/bin/python3
 export VINA_PATH=/usr/local/bin/vina
 
+# Optional tools for molecule preparation
+# If installed in non-standard locations, set these:
+export REDUCE_PATH=/usr/local/bin/reduce   # MolProbity reduce (adds hydrogens to proteins)
+export SCRUB_PY_PATH=/path/to/scrub.py      # scrub.py (protonation/tautomerization for ligands)
+
 # Start the server
 node server.js
 

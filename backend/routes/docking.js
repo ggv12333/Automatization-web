@@ -264,10 +264,10 @@ router.post("/prepare-ligands", uploadLimiter, upload.fields([
     logger.info("🔧 Preparing ligands from various formats", { requestId: req.id });
 
     const ligandFiles = {
-      smiles: req.files.ligandSmiles?.map(f => f.path) || [],
-      sdf: req.files.ligandSdf?.map(f => f.path) || [],
-      mol2: req.files.ligandMol2?.map(f => f.path) || [],
-      pdbqt: req.files.ligandPdbqt?.map(f => f.path) || []
+      smiles: req.files?.ligandSmiles?.map(f => f.path) || [],
+      sdf: req.files?.ligandSdf?.map(f => f.path) || [],
+      mol2: req.files?.ligandMol2?.map(f => f.path) || [],
+      pdbqt: req.files?.ligandPdbqt?.map(f => f.path) || []
     };
 
     // Validate all uploaded files
