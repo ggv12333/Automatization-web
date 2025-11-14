@@ -34,7 +34,7 @@ const progressMap = new Map();
 const SESSION_TIMEOUT = parseInt(process.env.SESSION_TIMEOUT) || 2 * 60 * 60 * 1000; // 2 hours
 const CLEANUP_INTERVAL = parseInt(process.env.SESSION_CLEANUP_INTERVAL) || 10 * 60 * 1000; // 10 minutes
 
-setInterval(() => {
+const _cleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [sessionId, data] of progressMap.entries()) {
     // Remove entries older than SESSION_TIMEOUT (default: 2 hours)
@@ -47,6 +47,11 @@ setInterval(() => {
     }
   }
 }, CLEANUP_INTERVAL);
+
+// Ensure this timer doesn't keep the Node process alive (helps Jest exit cleanly)
+if (typeof _cleanupInterval.unref === 'function') {
+  _cleanupInterval.unref();
+}
 
 // Configuración de multer para subir archivos
 const uploadPath = process.env.UPLOAD_PATH || path.join(__dirname, "../uploads");
