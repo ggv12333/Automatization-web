@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
     - name: Provide fake external tools for tests (vina/reduce/scrub)
       run: |
         mkdir -p ./tools/bin
@@ -44,7 +44,7 @@ jobs:
         echo "PATH=$(pwd)/tools/bin:$PATH" >> $GITHUB_ENV
     
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v3
       with:
         node-version: '18'
         cache: 'npm'
@@ -81,12 +81,12 @@ jobs:
       working-directory: ./backend
       run: node ./scripts/check_coverage.js
     - name: Upload to Codecov
-      uses: codecov/codecov-action@v4
+      uses: codecov/codecov-action@v3
       with:
         files: backend/coverage/lcov.info
         fail_ci_if_error: false
     - name: Upload coverage artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: coverage-report
         path: backend/coverage
@@ -99,10 +99,10 @@ jobs:
     continue-on-error: true  # No bloquear el workflow si el build falla (es muy largo)
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
     
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v2
     
     - name: Validate Dockerfile
       run: |
@@ -114,7 +114,7 @@ jobs:
         fi
     
     - name: Build Docker image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v3
       continue-on-error: true
       with:
         context: .
@@ -136,10 +136,10 @@ jobs:
     continue-on-error: true  # No fallar el workflow si hay vulnerabilidades, solo reportarlas
     
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
     
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@v0.28.0
       with:
         scan-type: 'fs'
         scan-ref: '.'
