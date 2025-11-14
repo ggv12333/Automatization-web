@@ -1,0 +1,67 @@
+name: CI Minimal
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Provide fake external tools for tests (vina/reduce/scrub)
+      run: |
+        mkdir -p ./tools/bin
+        cat > ./tools/bin/vina <<'EOF'
+        #!/bin/sh
+        if [ "$1" = "--version" ] || [ "$1" = "-v" ]; then
+          echo "AutoDock Vina 1.2.5"
+          exit 0
+        fi
+        echo "Vina shim called: $@" >&2
+        exit 0
+        EOF
+        cat > ./tools/bin/reduce <<'EOF'
+        #!/bin/sh
+        cat "$1"
+        EOF
+        cat > ./tools/bin/scrub.py <<'EOF'
+        #!/bin/sh
+        cp "$1" "$2"
+        EOF
+        chmod +x ./tools/bin/*
+        echo "PATH=$(pwd)/tools/bin:$PATH" >> $GITHUB_ENV
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    - name: Run backend tests
+      working-directory: ./backend
+      run: npm test -- --ci
+
+    - name: Archive coverage (if present)
+      run: |
+        # create a small tarball even if coverage is absent so upload step always has a file
+        if [ -d backend/coverage ]; then
+          tar -czf coverage.tar.gz -C backend coverage
+        else
+          mkdir -p .tmp_empty && tar -czf coverage.tar.gz -C .tmp_empty .
+        fi
+
+    - name: Upload coverage artifact
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: backend-coverage
+        path: coverage.tar.gz
+        retention-days: 5
