@@ -1,3 +1,36 @@
+# Production Dockerfile (illustrative). Builds a Conda environment with heavy chemistry deps.
+# Note: building this image may take a long time and requires sufficient disk/ram.
+FROM mambaforge/mambaforge:latest
+
+WORKDIR /opt/app
+
+# Create and activate a conda env 'docking' with Python and common chemistry packages
+RUN mamba create -y -n docking python=3.12 -c conda-forge \
+    rdkit openbabel vina || true
+
+# Use conda run for subsequent commands
+SHELL ["/bin/bash", "-lc"]
+
+# Install Python packages inside env
+RUN conda run -n docking python -m pip install --no-cache-dir requests meeko molscrub || true
+
+# Copy app into image
+COPY backend /opt/app/backend
+COPY frontend /opt/app/frontend
+
+# Add a shims dir to PATH (keeps parity with dev)
+ENV PATH=/opt/app/backend/shims:$PATH
+ENV PYTHONPATH=/opt/conda/envs/docking/bin/python
+
+# IMPORTANT: MGLTools (mk_prepare_receptor.py / mk_prepare_ligand.py) and MolProbity
+# reduce binary are not trivial to build and are not installed here. For production you
+# should either:
+#  - Install MGLTools (prebuilt) into the image, or
+#  - Mount MGLTools and reduce binaries at runtime and set REDUCE_PATH/SCRUB_PY_PATH.
+
+EXPOSE 8080
+
+CMD ["conda", "run", "-n", "docking", "node", "server.js"]
 # Production Dockerfile (full image) - same as project Dockerfile but separated for clarity
 # This will install Miniconda, create a conda env, install Vina and python deps.
 

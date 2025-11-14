@@ -1,3 +1,33 @@
+FROM node:18-bullseye
+
+WORKDIR /app
+
+# Copy source
+COPY backend/package.json backend/package-lock.json ./backend/
+COPY backend /app/backend
+COPY frontend /app/frontend
+
+WORKDIR /app/backend
+
+# Install node deps (production only to keep image smaller)
+RUN npm ci --only=production || true
+
+# Install Python runtime and minimal Python deps needed for the preparer
+RUN apt-get update && apt-get install -y python3 python3-pip ca-certificates --no-install-recommends \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --no-cache-dir requests
+
+# Make shims executable (if present)
+RUN if [ -d /app/backend/shims ]; then chmod +x /app/backend/shims/* || true; fi
+
+ENV UPLOAD_PATH=/app/backend/uploads
+ENV PYTHON_PATH=/usr/bin/python3
+ENV PATH=/app/backend/shims:$PATH
+
+EXPOSE 8080
+
+CMD ["node", "server.js"]
 # Lightweight development Dockerfile
 # Purpose: fast local builds for development and CI quick checks.
 # This image uses official Node and provides the same app runtime but without Conda/Vina installs.
