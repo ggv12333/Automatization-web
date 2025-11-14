@@ -138,20 +138,26 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
+    - name: Install Trivy CLI
+      run: |
+        echo "Installing Trivy CLI..."
+        sudo apt-get update -y && sudo apt-get install -y wget ca-certificates
+        wget -O /tmp/trivy.tar.gz https://github.com/aquasecurity/trivy/releases/download/v0.28.0/trivy_0.28.0_Linux-64bit.tar.gz
+        sudo tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy
+        trivy --version || true
+      continue-on-error: true
+
     - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@v0.28.0
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-        severity: 'CRITICAL,HIGH'  # Solo reportar críticas y altas
+      run: |
+        echo "Running Trivy scan (filesystem -> SARIF)..."
+        trivy fs --format sarif --output trivy-results.sarif . || echo "Trivy scan returned non-zero exit"
       continue-on-error: true
-    
-    - name: Upload Trivy results to GitHub Security
+
+    - name: Upload Trivy SARIF artifact
       if: always() && hashFiles('trivy-results.sarif') != ''
-      uses: github/codeql-action/upload-sarif@v2
-      continue-on-error: true
+      uses: actions/upload-artifact@v3
       with:
-        sarif_file: 'trivy-results.sarif'
+        name: trivy-sarif
+        path: trivy-results.sarif
+        retention-days: 5
 
