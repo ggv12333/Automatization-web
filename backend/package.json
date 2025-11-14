@@ -1,4 +1,5 @@
 {
+  "$schema": "./package-local.schema.json",
   "name": "automatizacion-web",
   "version": "1.0.0",
   "type": "module",
@@ -16,7 +17,6 @@
   "license": "ISC",
   "dependencies": {
     "archiver": "^7.0.1",
-    "child_process": "^1.0.2",
     "compression": "^1.7.4",
     "cors": "^2.8.5",
     "express": "^5.1.0",
