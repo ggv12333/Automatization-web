@@ -47,6 +47,9 @@ jobs:
     - name: Run coverage
       working-directory: ./backend
       run: npm run test:coverage -- --ci
+    - name: Enforce coverage thresholds
+      working-directory: ./backend
+      run: node ./scripts/check_coverage.js
     - name: Upload to Codecov
       uses: codecov/codecov-action@v4
       with:
