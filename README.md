@@ -1,5 +1,5 @@
 # 🧬 AutoDock Vina - Molecular Docking Automation Platform
-![Coverage](https://img.shields.io/badge/coverage-18%25-red)
+[![codecov](https://codecov.io/gh/ggv12333/Automatization-web/branch/main/graph/badge.svg)](https://codecov.io/gh/ggv12333/Automatization-web)
 
 A modern web-based automation platform for running AutoDock Vina molecular docking simulations with multiple receptors and ligands. Features a step-by-step wizard interface, real-time progress tracking, and automatic result downloads.
 
