@@ -132,32 +132,34 @@ function parseConfigFile(filePath) {
 
 // Route to download and prepare PDB
 router.post("/download-pdb", uploadLimiter, async (req, res) => {
-  const { pdbCode } = req.body;
+  // Accept either a single `pdbCode` or an array `pdbCodes` for batch processing
+  const { pdbCode, pdbCodes } = req.body;
+  const codes = Array.isArray(pdbCodes) ? pdbCodes : (pdbCode ? [pdbCode] : []);
 
-  // Validate PDB code format
-  if (!isValidPDBCode(pdbCode)) {
-    logSecurityEvent('INVALID_PDB_CODE', {
-      pdbCode,
-      ip: req.ip,
-      requestId: req.id
-    });
-    return res.status(400).json({
-      error: "Invalid PDB code format. Must be 4 characters: digit followed by 3 alphanumeric characters.",
-      requestId: req.id
-    });
+  if (codes.length === 0) {
+    return res.status(400).json({ error: 'No pdbCode or pdbCodes provided', requestId: req.id });
+  }
+
+  // Validate all PDB codes
+  for (const code of codes) {
+    if (!isValidPDBCode(code)) {
+      logSecurityEvent('INVALID_PDB_CODE', { pdbCode: code, ip: req.ip, requestId: req.id });
+      return res.status(400).json({
+        error: `Invalid PDB code format: ${code}`,
+        requestId: req.id
+      });
+    }
   }
 
   const pythonPath = process.env.PYTHON_PATH || "/usr/bin/python3";
   const preparePath = path.join(__dirname, "../python/prepare_molecules.py");
 
   try {
-    logger.info(`📥 Downloading PDB: ${pdbCode}`, { requestId: req.id });
+    logger.info(`📥 Downloading PDB(s): ${codes.join(',')}`, { requestId: req.id });
 
-    // Sanitize PDB code (already validated, but extra safety)
-    const sanitizedPdbCode = pdbCode.trim().toUpperCase();
-
-    // Call Python script to download and prepare PDB with timeout
-    const child = spawn(pythonPath, [preparePath, "download-pdb", sanitizedPdbCode, uploadPath]);
+    // Call Python script to download and prepare PDB(s) with timeout
+    const payload = JSON.stringify(codes.map(c => c.trim().toUpperCase()));
+    const child = spawn(pythonPath, [preparePath, "download-pdbs", payload, uploadPath]);
 
     let output = "";
     let error = "";
@@ -167,7 +169,7 @@ router.post("/download-pdb", uploadLimiter, async (req, res) => {
     const TIMEOUT_MS = 5 * 60 * 1000;
     timeoutHandle = setTimeout(() => {
       child.kill('SIGTERM');
-      logger.error('PDB download timeout', { pdbCode: sanitizedPdbCode, requestId: req.id });
+      logger.error('PDB download timeout', { pdbCodes: codes.join(','), requestId: req.id });
     }, TIMEOUT_MS);
 
     child.stdout.on("data", (data) => {
@@ -184,18 +186,32 @@ router.post("/download-pdb", uploadLimiter, async (req, res) => {
       clearTimeout(timeoutHandle);
 
       if (code === 0) {
-        const pdbqtFile = path.join(uploadPath, `${sanitizedPdbCode}_receptor.pdbqt`);
-        logger.info(`PDB download successful: ${sanitizedPdbCode}`, { requestId: req.id });
-        res.json({
-          success: true,
-          message: `PDB ${sanitizedPdbCode} downloaded and prepared`,
-          pdbqtFile: pdbqtFile,
-          requestId: req.id
-        });
+        if (codes.length === 1) {
+          const single = codes[0].trim().toUpperCase();
+          const pdbqtFile = path.join(uploadPath, `${single}_receptor.pdbqt`);
+          logger.info(`PDB download successful: ${single}`, { requestId: req.id });
+          res.json({
+            success: true,
+            message: `PDB ${single} downloaded and prepared`,
+            pdbqtFile: pdbqtFile,
+            requestId: req.id
+          });
+        } else {
+          // Return list of generated files for each requested code
+          const files = codes.map(c => ({ code: c.trim().toUpperCase(), pdbqt: path.join(uploadPath, `${c.trim().toUpperCase()}_receptor.pdbqt`) }));
+          logger.info(`PDB downloads successful: ${codes.join(',')}`, { requestId: req.id });
+          res.json({
+            success: true,
+            message: `PDBs downloaded and prepared`,
+            files,
+            requestId: req.id
+          });
+        }
       } else {
-        logger.error(`PDB download failed: ${sanitizedPdbCode}`, { code, error, requestId: req.id });
+        logger.error(`PDB download failed for codes: ${codes.join(',')}`, { code, error, requestId: req.id });
         res.status(500).json({
-          error: `Failed to download PDB`,
+          error: `Failed to download/prepare one or more PDBs`,
+          details: error,
           requestId: req.id
         });
       }

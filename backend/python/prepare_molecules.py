@@ -84,11 +84,11 @@ class MoleculePreparator:
                 print(f"✅ reduce completed, wrote: {reduced_pdb}", flush=True)
                 pdb_to_use = reduced_pdb
             except FileNotFoundError:
-                print(f"⚠️  reduce not found at {self.reduce_exec}, skipping hydrogen addition", flush=True)
-                pdb_to_use = pdb_path
+                print(f"❌ reduce not found at {self.reduce_exec}. Aborting receptor preparation.", flush=True)
+                return None
             except subprocess.CalledProcessError as e:
-                print(f"⚠️  reduce failed: {e}. Continuing with original PDB", flush=True)
-                pdb_to_use = pdb_path
+                print(f"❌ reduce failed: {e}. Aborting receptor preparation.", flush=True)
+                return None
 
             # Now call mk_prepare_receptor.py on the (possibly reduced) PDB
             cmd = [
@@ -160,7 +160,15 @@ class MoleculePreparator:
                 if input_path.suffix.lower() in ['.sdf', '.mol2', '.smi', '.smiles']:
                     scrub_out = self.output_dir / f"{input_path.stem}_scrubbed{input_path.suffix}"
                     print(f"🧪 Running scrub ({self.scrub_exec}) on {input_path.name}...", flush=True)
-                    proc = subprocess.run([self.scrub_exec, str(input_path), str(scrub_out)], capture_output=True, text=True, check=True)
+                    try:
+                        proc = subprocess.run([self.scrub_exec, str(input_path), str(scrub_out)], capture_output=True, text=True, check=True)
+                    except FileNotFoundError:
+                        print(f"❌ scrub.py not found at {self.scrub_exec}. Aborting ligand preparation.", flush=True)
+                        return None
+                    except subprocess.CalledProcessError as e:
+                        print(f"❌ scrub.py failed: {e}. Aborting ligand preparation.", flush=True)
+                        return None
+
                     if scrub_out.exists():
                         preprocessed_input = scrub_out
                         print(f"✅ scrub completed, wrote: {scrub_out}", flush=True)
@@ -200,7 +208,28 @@ class MoleculePreparator:
                     smiles = parts[0]
                     name = parts[1] if len(parts) > 1 else f"ligand_{idx}"
                     
-                    pdbqt = self.prepare_ligand_from_smiles(smiles, name)
+                    # Use scrub.py to protonate/tautomerize and generate 3D conformer SDF
+                    # Create a temporary input SMILES file for scrub
+                    tmp_smi = self.output_dir / f"{name}_{idx}.smi"
+                    tmp_sdf = self.output_dir / f"{name}_{idx}.sdf"
+                    with open(tmp_smi, 'w') as tf:
+                        tf.write(smiles + '\n')
+
+                    try:
+                        print(f"🧪 Running scrub ({self.scrub_exec}) on SMILES {name}...", flush=True)
+                        proc = subprocess.run([self.scrub_exec, str(tmp_smi), str(tmp_sdf)], capture_output=True, text=True, check=True)
+                    except FileNotFoundError:
+                        print(f"❌ scrub.py not found at {self.scrub_exec}. Aborting SMILES processing.", flush=True)
+                        return None
+                    except subprocess.CalledProcessError as e:
+                        print(f"❌ scrub.py failed for {name}: {e}. Aborting SMILES processing.", flush=True)
+                        return None
+
+                    if not tmp_sdf.exists():
+                        print(f"❌ scrub did not produce SDF for {name}. Aborting.", flush=True)
+                        return None
+
+                    pdbqt = self.prepare_ligand_from_file(str(tmp_sdf))
                     if pdbqt:
                         results.append(pdbqt)
             
@@ -307,7 +336,8 @@ def main():
             if pdbqt:
                 prepared_files.append(pdbqt)
             else:
-                errors.append(f"Failed to convert SDF: {sdf_file}")
+                print(f"❌ scrub or ligand preparation failed for SDF: {sdf_file}", file=sys.stderr)
+                sys.exit(1)
         
         # Process MOL2 files
         for mol2_file in ligand_files.get('mol2', []):
@@ -319,7 +349,8 @@ def main():
             if pdbqt:
                 prepared_files.append(pdbqt)
             else:
-                errors.append(f"Failed to convert MOL2: {mol2_file}")
+                print(f"❌ scrub or ligand preparation failed for MOL2: {mol2_file}", file=sys.stderr)
+                sys.exit(1)
         
         # PDBQT files are already prepared, just copy them
         for pdbqt_file in ligand_files.get('pdbqt', []):
@@ -345,6 +376,49 @@ def main():
             print("❌ No ligands were successfully prepared", file=sys.stderr)
             sys.exit(1)
         
+        sys.exit(0)
+    elif command == "download-pdbs":
+        # New: accept JSON list of PDB codes
+        if len(sys.argv) != 4:
+            print("❌ Error: download-pdbs requires: <json_pdb_list> <output_dir>", file=sys.stderr)
+            sys.exit(1)
+
+        import json
+        try:
+            pdb_list = json.loads(sys.argv[2])
+            if not isinstance(pdb_list, list):
+                raise ValueError('Expected a JSON list of PDB codes')
+        except Exception as e:
+            print(f"❌ Error parsing PDB list JSON: {e}", file=sys.stderr)
+            sys.exit(1)
+
+        output_dir = sys.argv[3]
+        preparator = MoleculePreparator(output_dir)
+        results = []
+        failures = []
+
+        for pdb_code in pdb_list:
+            pdb_code = str(pdb_code).strip().upper()
+            print(f"📥 Downloading PDB: {pdb_code}", flush=True)
+            pdb_file = preparator.download_pdb(pdb_code)
+            if not pdb_file:
+                failures.append((pdb_code, 'download_failed'))
+                continue
+
+            pdbqt = preparator.prepare_receptor(str(pdb_file))
+            if not pdbqt:
+                failures.append((pdb_code, 'prepare_failed'))
+                continue
+
+            results.append(str(pdbqt))
+
+        if failures:
+            for f in failures:
+                print(f"⚠️  Failed: {f[0]} -> {f[1]}", file=sys.stderr, flush=True)
+            sys.exit(1)
+
+        for r in results:
+            print(f"✅ Success: {r}", flush=True)
         sys.exit(0)
     
     else:
