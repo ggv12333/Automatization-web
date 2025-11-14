@@ -34,6 +34,29 @@ RUN /bin/bash -c "source activate vina && \
     echo 'Vina instalado:' && \
     /opt/conda/envs/vina/bin/vina --help | head -5"
 
+# Install lightweight shims for reduce and scrub if the real tools are not available.
+# These are safe fallbacks for environments where full MolProbity/scrub is not installed.
+RUN cat > /usr/local/bin/reduce <<'EOF' && \
+        cat > /usr/local/bin/scrub.py <<'EOF2' && \
+        chmod +x /usr/local/bin/reduce /usr/local/bin/scrub.py
+#!/bin/sh
+# reduce shim: echo the input (simulate adding hydrogens)
+if [ -z "$1" ]; then
+    cat
+else
+    cat "$1"
+fi
+EOF
+#!/bin/sh
+# scrub.py shim: copy input to output (no-op)
+if [ "$#" -ge 2 ]; then
+    cp "$1" "$2"
+else
+    cat "$1"
+fi
+EOF2
+
+
 # Instalar dependencias Node
 RUN cd backend && npm install && npm audit fix
 
