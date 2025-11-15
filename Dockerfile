@@ -3,7 +3,7 @@ FROM continuumio/miniconda3:24.1.2-0
 
 # Instalar Node.js 18.x (LTS) desde NodeSource y herramientas necesarias
 RUN apt-get update && apt-get install -y \
-    wget unzip curl ca-certificates gnupg \
+    wget unzip curl ca-certificates gnupg openbabel \
     && mkdir -p /etc/apt/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
     && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list \
@@ -23,7 +23,7 @@ COPY swagger.json ./
 # Crear el entorno Conda, instalar paquetes y dependencias de requirements.txt
 RUN conda create -y -n vina python=3.12 \
     && conda install -n vina -c conda-forge numpy swig boost-cpp libboost sphinx sphinx_rtd_theme -y \
-    && /bin/bash -c "source activate vina && pip install -r requirements.txt && pip install meeko rdkit" \
+    && /bin/bash -c "source activate vina && pip install -r requirements.txt && pip install meeko rdkit biopython" \
     && conda clean -afy
 
 # Descargar e instalar AutoDock Vina desde GitHub (versión x86_64 para Linux)
@@ -35,26 +35,81 @@ RUN /bin/bash -c "source activate vina && \
     echo 'Vina instalado:' && \
     /opt/conda/envs/vina/bin/vina --help | head -5"
 
-# Install lightweight shims for reduce and scrub if the real tools are not available.
-# These are safe fallbacks for environments where full MolProbity/scrub is not installed.
+# Install small utilities for molecular processing: OpenBabel and a Python scrub tool
 RUN cat > /usr/local/bin/reduce <<'EOF' && \
         cat > /usr/local/bin/scrub.py <<'EOF2' && \
         chmod +x /usr/local/bin/reduce /usr/local/bin/scrub.py
 #!/bin/sh
-# reduce shim: echo the input (simulate adding hydrogens)
+# reduce wrapper using OpenBabel (adds hydrogens where possible)
 if [ -z "$1" ]; then
     cat
-else
-    cat "$1"
+    exit 0
 fi
+IN="$1"
+OUT="${2:-/dev/stdout}"
+EXT="${IN##*.}"
+case "$EXT" in
+  mol2)
+    obabel -i mol2 "$IN" -o mol2 -O "$OUT" --addH || cat "$IN" > "$OUT"
+    ;;
+  pdb)
+    obabel -ipdb "$IN" -opdb -O "$OUT" --addH || cat "$IN" > "$OUT"
+    ;;
+  pdbqt)
+    obabel -ipdbqt "$IN" -opdbqt -O "$OUT" --addH || cat "$IN" > "$OUT"
+    ;;
+  *)
+    # Try generic format detection
+    obabel "$IN" -O "$OUT" --addH 2>/dev/null || cat "$IN" > "$OUT"
+    ;;
+esac
 EOF
-#!/bin/sh
-# scrub.py shim: copy input to output (no-op)
-if [ "$#" -ge 2 ]; then
-    cp "$1" "$2"
-else
-    cat "$1"
-fi
+#!/usr/bin/env python3
+import sys
+try:
+    from Bio.PDB import PDBParser, PDBIO, Select
+except Exception:
+    # If Biopython is not available, act as a passthrough
+    if len(sys.argv) >= 3:
+        import shutil
+        shutil.copyfile(sys.argv[1], sys.argv[2])
+    else:
+        sys.stdout.write(sys.stdin.read())
+    sys.exit(0)
+
+class NoHydrogensSelect(Select):
+    def accept_atom(self, atom):
+        name = atom.get_name()
+        # Filter out hydrogens by element or atom name starting with H
+        element = getattr(atom, 'element', None)
+        if element and element.upper().startswith('H'):
+            return False
+        if name and name.strip().upper().startswith('H'):
+            return False
+        return True
+
+def main():
+    if len(sys.argv) < 2:
+        # passthrough stdin
+        sys.stdout.write(sys.stdin.read())
+        return
+    inp = sys.argv[1]
+    out = sys.argv[2] if len(sys.argv) > 2 else None
+    parser = PDBParser(QUIET=True)
+    structure = parser.get_structure('mol', inp)
+    io = PDBIO()
+    io.set_structure(structure)
+    if out:
+        io.save(out, NoHydrogensSelect())
+    else:
+        # write to stdout
+        import io as _io
+        fh = _io.StringIO()
+        io.save(fh, NoHydrogensSelect())
+        sys.stdout.write(fh.getvalue())
+
+if __name__ == '__main__':
+    main()
 EOF2
 
 
