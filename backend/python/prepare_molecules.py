@@ -32,6 +32,15 @@ except ImportError:
     print("⚠️  Warning: RDKit not available. SMILES conversion will be limited.", file=sys.stderr)
 
 
+# Try to import PDBFixer (optional fallback for adding hydrogens if `reduce` binary is not available)
+try:
+    from pdbfixer import PDBFixer
+    from openmm.app import PDBFile
+    PDBFIXER_AVAILABLE = True
+except Exception:
+    PDBFIXER_AVAILABLE = False
+
+
 class MoleculePreparator:
     """Handles preparation of molecules for docking"""
     
@@ -84,8 +93,18 @@ class MoleculePreparator:
                 print(f"✅ reduce completed, wrote: {reduced_pdb}", flush=True)
                 pdb_to_use = reduced_pdb
             except FileNotFoundError:
-                print(f"❌ reduce not found at {self.reduce_exec}. Aborting receptor preparation.", flush=True)
-                return None
+                print(f"⚠️  reduce not found at {self.reduce_exec}. Trying PDBFixer fallback...", flush=True)
+                # Try PDBFixer fallback if available
+                if PDBFIXER_AVAILABLE:
+                    ok = self._add_hydrogens_with_pdbfixer(pdb_path, reduced_pdb)
+                    if ok:
+                        pdb_to_use = reduced_pdb
+                    else:
+                        print(f"❌ PDBFixer failed to add hydrogens. Aborting receptor preparation.", flush=True)
+                        return None
+                else:
+                    print(f"❌ PDBFixer not available. Aborting receptor preparation.", flush=True)
+                    return None
             except subprocess.CalledProcessError as e:
                 print(f"❌ reduce failed: {e}. Aborting receptor preparation.", flush=True)
                 return None
@@ -103,6 +122,32 @@ class MoleculePreparator:
         except Exception as e:
             print(f"❌ Error preparing receptor: {str(e)}", flush=True)
             return None
+
+    def _add_hydrogens_with_pdbfixer(self, pdb_path: Path, out_pdb: Path) -> bool:
+        """Fallback: use PDBFixer (if available) to add hydrogens and write a PDB file.
+
+        Returns True on success and writes `out_pdb`.
+        """
+        if not PDBFIXER_AVAILABLE:
+            return False
+
+        try:
+            print(f"🧪 PDBFixer: adding hydrogens to {pdb_path.name}...", flush=True)
+            fixer = PDBFixer(filename=str(pdb_path))
+            fixer.findMissingResidues()
+            fixer.findMissingAtoms()
+            fixer.addMissingAtoms()
+            fixer.addMissingHydrogens(7.0)
+
+            # Write out using OpenMM PDBFile
+            with open(out_pdb, 'w') as f:
+                PDBFile.writeFile(fixer.topology, fixer.positions, f)
+
+            print(f"✅ PDBFixer completed, wrote: {out_pdb}", flush=True)
+            return True
+        except Exception as e:
+            print(f"❌ PDBFixer failed: {e}", flush=True)
+            return False
     
     def prepare_ligand_from_smiles(self, smiles: str, ligand_name: str) -> Optional[Path]:
         """Convert SMILES to PDBQT"""
@@ -159,21 +204,32 @@ class MoleculePreparator:
                 # Only run scrub for typical molecule formats
                 if input_path.suffix.lower() in ['.sdf', '.mol2', '.smi', '.smiles']:
                     scrub_out = self.output_dir / f"{input_path.stem}_scrubbed{input_path.suffix}"
-                    print(f"🧪 Running scrub ({self.scrub_exec}) on {input_path.name}...", flush=True)
-                    try:
-                        proc = subprocess.run([self.scrub_exec, str(input_path), str(scrub_out)], capture_output=True, text=True, check=True)
-                    except FileNotFoundError:
-                        print(f"❌ scrub.py not found at {self.scrub_exec}. Aborting ligand preparation.", flush=True)
-                        return None
-                    except subprocess.CalledProcessError as e:
-                        print(f"❌ scrub.py failed: {e}. Aborting ligand preparation.", flush=True)
-                        return None
 
-                    if scrub_out.exists():
-                        preprocessed_input = scrub_out
-                        print(f"✅ scrub completed, wrote: {scrub_out}", flush=True)
-            except FileNotFoundError:
-                print(f"⚠️  scrub.py not found at {self.scrub_exec}, skipping ligand protonation", flush=True)
+                    # If an external scrub script is available, use it. Otherwise use RDKit fallback.
+                    if shutil.which(self.scrub_exec):
+                        print(f"🧪 Running scrub ({self.scrub_exec}) on {input_path.name}...", flush=True)
+                        try:
+                            proc = subprocess.run([self.scrub_exec, str(input_path), str(scrub_out)], capture_output=True, text=True, check=True)
+                        except subprocess.CalledProcessError as e:
+                            print(f"❌ scrub.py failed: {e}. Aborting ligand preparation.", flush=True)
+                            return None
+
+                        if scrub_out.exists():
+                            preprocessed_input = scrub_out
+                            print(f"✅ scrub completed, wrote: {scrub_out}", flush=True)
+                    else:
+                        # Try RDKit-based scrub fallback
+                        if RDKIT_AVAILABLE:
+                            print(f"⚠️  scrub.py not found. Using RDKit fallback for {input_path.name}...", flush=True)
+                            ok = self._rdkit_scrub_file(input_path, scrub_out)
+                            if not ok:
+                                print(f"❌ RDKit scrub fallback failed for {input_path.name}", flush=True)
+                                return None
+                            preprocessed_input = scrub_out
+                            print(f"✅ RDKit scrub completed, wrote: {scrub_out}", flush=True)
+                        else:
+                            print(f"❌ scrub.py not found and RDKit unavailable. Aborting ligand preparation.", flush=True)
+                            return None
             except subprocess.CalledProcessError as e:
                 print(f"⚠️  scrub.py failed: {e}. Continuing with original ligand file", flush=True)
 
@@ -190,6 +246,84 @@ class MoleculePreparator:
         except Exception as e:
             print(f"❌ Error preparing ligand: {str(e)}", flush=True)
             return None
+
+    def _rdkit_scrub_file(self, input_path: Path, out_sdf: Path) -> bool:
+        """RDKit-based fallback to generate a protonated/3D SDF for common input types.
+
+        Returns True on success and writes `out_sdf`.
+        """
+        if not RDKIT_AVAILABLE:
+            return False
+
+        try:
+            suffix = input_path.suffix.lower()
+            mols = []
+
+            if suffix in ['.sdf']:
+                suppl = Chem.SDMolSupplier(str(input_path), removeHs=False)
+                mols = [m for m in suppl if m is not None]
+            elif suffix in ['.mol2']:
+                # RDKit can read mol2 via Chem.MolFromMol2Block after reading file
+                with open(input_path, 'r') as f:
+                    block = f.read()
+                m = Chem.MolFromMol2Block(block)
+                mols = [m] if m is not None else []
+            elif suffix in ['.smi', '.smiles']:
+                with open(input_path, 'r') as f:
+                    for line in f:
+                        s = line.strip().split()[0]
+                        m = Chem.MolFromSmiles(s)
+                        if m is not None:
+                            mols.append(m)
+            else:
+                # Try reading as SMILES line by line
+                with open(input_path, 'r') as f:
+                    for line in f:
+                        s = line.strip().split()[0]
+                        m = Chem.MolFromSmiles(s)
+                        if m is not None:
+                            mols.append(m)
+
+            if not mols:
+                return False
+
+            writer = Chem.SDWriter(str(out_sdf))
+            for m in mols:
+                mm = Chem.AddHs(m)
+                AllChem.EmbedMolecule(mm, randomSeed=42)
+                try:
+                    AllChem.MMFFOptimizeMolecule(mm)
+                except Exception:
+                    pass
+                writer.write(mm)
+            writer.close()
+            return True
+        except Exception as e:
+            print(f"❌ RDKit scrub error: {e}", flush=True)
+            return False
+
+    def _rdkit_scrub_smiles(self, smiles: str, out_sdf: Path) -> bool:
+        """Create a 3D conformer SDF from a SMILES string using RDKit."""
+        if not RDKIT_AVAILABLE:
+            return False
+
+        try:
+            m = Chem.MolFromSmiles(smiles)
+            if m is None:
+                return False
+            mm = Chem.AddHs(m)
+            AllChem.EmbedMolecule(mm, randomSeed=42)
+            try:
+                AllChem.MMFFOptimizeMolecule(mm)
+            except Exception:
+                pass
+            w = Chem.SDWriter(str(out_sdf))
+            w.write(mm)
+            w.close()
+            return True
+        except Exception as e:
+            print(f"❌ RDKit scrub (SMILES) error: {e}", flush=True)
+            return False
     
     def process_smiles_file(self, smiles_file: str) -> List[Path]:
         """Process SMILES file (one SMILES per line)"""
@@ -215,15 +349,24 @@ class MoleculePreparator:
                     with open(tmp_smi, 'w') as tf:
                         tf.write(smiles + '\n')
 
-                    try:
+                    # Use external scrub if available, otherwise RDKit fallback
+                    if shutil.which(self.scrub_exec):
                         print(f"🧪 Running scrub ({self.scrub_exec}) on SMILES {name}...", flush=True)
-                        proc = subprocess.run([self.scrub_exec, str(tmp_smi), str(tmp_sdf)], capture_output=True, text=True, check=True)
-                    except FileNotFoundError:
-                        print(f"❌ scrub.py not found at {self.scrub_exec}. Aborting SMILES processing.", flush=True)
-                        return None
-                    except subprocess.CalledProcessError as e:
-                        print(f"❌ scrub.py failed for {name}: {e}. Aborting SMILES processing.", flush=True)
-                        return None
+                        try:
+                            proc = subprocess.run([self.scrub_exec, str(tmp_smi), str(tmp_sdf)], capture_output=True, text=True, check=True)
+                        except subprocess.CalledProcessError as e:
+                            print(f"❌ scrub.py failed for {name}: {e}. Aborting SMILES processing.", flush=True)
+                            return None
+                    else:
+                        if RDKIT_AVAILABLE:
+                            print(f"⚠️  scrub.py not found. Using RDKit fallback for SMILES {name}...", flush=True)
+                            ok = self._rdkit_scrub_smiles(smiles, tmp_sdf)
+                            if not ok:
+                                print(f"❌ RDKit scrub failed for {name}. Aborting.", flush=True)
+                                return None
+                        else:
+                            print(f"❌ scrub.py not found and RDKit unavailable. Aborting SMILES processing.", flush=True)
+                            return None
 
                     if not tmp_sdf.exists():
                         print(f"❌ scrub did not produce SDF for {name}. Aborting.", flush=True)

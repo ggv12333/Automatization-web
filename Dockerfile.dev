@@ -1,3 +1,64 @@
+FROM node:18-bullseye-slim
+
+WORKDIR /app
+
+# Copy app sources
+COPY backend/ ./backend
+COPY frontend/ ./frontend
+COPY swagger.json ./swagger.json
+
+# Install system packages (python, pip) and create shims
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 python3-pip ca-certificates curl wget gnupg \
+  && rm -rf /var/lib/apt/lists/* \
+  && ln -sf $(which python3) /usr/bin/python3 || true
+
+# Install Python deps required at runtime
+RUN /usr/bin/python3 -m pip install --no-cache-dir requests || true
+
+# Create simple shims for reduce and scrub.py if not provided (development convenience)
+RUN mkdir -p /usr/local/bin && \
+    cat > /usr/local/bin/reduce <<'EOF' && chmod +x /usr/local/bin/reduce || true
+#!/bin/sh
+if [ -z "$1" ]; then
+  cat
+else
+  cat "$1"
+fi
+EOF
+
+RUN cat > /usr/local/bin/scrub.py <<'EOF2' && chmod +x /usr/local/bin/scrub.py || true
+#!/usr/bin/env python3
+import sys, shutil
+if len(sys.argv) >= 3:
+    shutil.copy2(sys.argv[1], sys.argv[2])
+else:
+    with open(sys.argv[1],'rb') as f:
+        sys.stdout.buffer.write(f.read())
+EOF2
+
+# Install Node dependencies
+WORKDIR /app/backend
+RUN npm ci --silent --no-audit --no-fund || true
+
+# Ensure shims directory from repo is executable
+RUN if [ -d /app/backend/shims ]; then chmod +x /app/backend/shims/* || true; fi
+
+# Create uploads directory and non-root user
+RUN mkdir -p /app/backend/uploads /tmp/workdir && useradd -m appuser || true && chown -R appuser:appuser /app /app/backend/uploads /tmp/workdir
+
+ENV UPLOAD_PATH=/app/backend/uploads
+ENV PYTHON_PATH=/usr/bin/python3
+ENV PATH=/app/backend/shims:/usr/local/bin:$PATH
+
+USER appuser
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:8080/health || exit 1
+
+CMD ["node", "backend/server.js"]
 FROM node:18-bullseye
 
 WORKDIR /app
@@ -13,10 +74,12 @@ WORKDIR /app/backend
 RUN npm ci --only=production || true
 
 # Install Python runtime and minimal Python deps needed for the preparer
-RUN apt-get update && apt-get install -y python3 python3-pip ca-certificates --no-install-recommends \
-  && rm -rf /var/lib/apt/lists/*
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 python3-pip ca-certificates curl gnupg \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf $(which python3) /usr/bin/python3 || true
 
-RUN python3 -m pip install --no-cache-dir requests
+RUN /usr/bin/python3 -m pip install --no-cache-dir requests
 
 # Make shims executable (if present)
 RUN if [ -d /app/backend/shims ]; then chmod +x /app/backend/shims/* || true; fi

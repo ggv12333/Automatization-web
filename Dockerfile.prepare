@@ -1,0 +1,38 @@
+# Dockerfile.prepare
+# Purpose: reproducible environment for molecule preparation (RDKit, OpenMM/PDBFixer, Meeko)
+# This image is separate from the main app Dockerfile so it focuses on scientific dependencies.
+
+FROM condaforge/mambaforge:latest
+
+SHELL ["/bin/bash", "-lc"]
+
+# Basic system packages
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       wget \
+       ca-certificates \
+       build-essential \
+       git \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* || true
+
+# Install main scientific deps into base conda env (best-effort)
+RUN /opt/conda/bin/mamba install -n base -c conda-forge -y \
+        python=3.10 \
+        rdkit \
+        openmm \
+        pdbfixer \
+        meeko || true
+
+# Try best-effort to install MolProbity 'reduce' (system package) -- optional
+RUN apt-get update && apt-get install -y --no-install-recommends reduce || true || true
+
+# Create workdir and copy repository
+WORKDIR /work
+COPY . /work
+
+# Make scripts executable
+RUN chmod +x backend/python/prepare_molecules.py || true
+
+# Default to bash; you can run specific commands via `docker run ... bash -lc "<cmd>"`
+ENTRYPOINT ["/bin/bash"]
