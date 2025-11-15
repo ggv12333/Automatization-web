@@ -25,10 +25,19 @@ logger.info("🟢 Starting server...");
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load Swagger documentation
-const swaggerDocument = JSON.parse(
-  readFileSync(path.join(__dirname, "../swagger.json"), "utf8")
-);
+// Load Swagger documentation with graceful fallback
+let swaggerDocument;
+try {
+  const swaggerRaw = readFileSync(path.join(__dirname, "../swagger.json"), "utf8");
+  swaggerDocument = JSON.parse(swaggerRaw);
+} catch (err) {
+  logger.warn('Could not load swagger.json; using fallback minimal swagger document', { error: err && err.message });
+  swaggerDocument = {
+    openapi: "3.0.0",
+    info: { title: "API (swagger.json missing)", version: "0.0.0" },
+    paths: {}
+  };
+}
 
 const app = express();
 

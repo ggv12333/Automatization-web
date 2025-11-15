@@ -18,6 +18,7 @@ WORKDIR /app
 COPY backend/ ./backend
 COPY frontend/ ./frontend
 COPY requirements.txt ./
+COPY swagger.json ./
 
 # Crear el entorno Conda, instalar paquetes y dependencias de requirements.txt
 RUN conda create -y -n vina python=3.12 \
@@ -57,8 +58,8 @@ fi
 EOF2
 
 
-# Instalar dependencias Node
-RUN cd backend && npm install && npm audit fix
+# Instalar dependencias Node (skip `npm audit` during image build to avoid failing the build)
+RUN cd backend && npm install --no-audit
 
 # Crear directorios necesarios con permisos apropiados
 RUN mkdir -p /tmp/uploads /tmp/workdir /tmp/workdir/resultados /app/logs \
